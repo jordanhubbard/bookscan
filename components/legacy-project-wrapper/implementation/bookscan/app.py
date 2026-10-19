@@ -1,4 +1,4 @@
-"""Qt desktop scanning workflow with explicit review before durable storage."""
+"""Qt desktop book scanning with immediate capture storage and page editing."""
 import argparse
 import math
 from pathlib import Path
@@ -7,7 +7,7 @@ import tempfile
 from uuid import uuid4
 
 from PySide6.QtCore import Qt, QTimer, QStandardPaths, QSize, QPointF, QRectF, Signal
-from PySide6.QtGui import QImage, QImageReader, QPixmap, QTransform, QIcon, QPainter, QColor, QPen, QFont
+from PySide6.QtGui import QImage, QImageReader, QPixmap, QTransform, QIcon, QPainter, QColor, QPen, QFont, QShortcut, QKeySequence
 from PySide6.QtMultimedia import QCamera, QImageCapture, QMediaCaptureSession, QMediaDevices
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtWidgets import (
@@ -133,7 +133,7 @@ class BookForm(QGroupBox):
 
     def set_busy(self, busy):
         self.busy = busy
-        self.submit_button.setToolTip("Save or cancel the current snapshot first" if busy else "")
+        self.submit_button.setToolTip("Save or cancel the current snapshot first" if busy else "Create book / save book details (Alt+Enter)")
         self.update_state()
 
     def populate(self, book=None):
@@ -401,7 +401,7 @@ class ScanWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.video = QVideoWidget()
         self.preview = ImageView()
-        self.empty = QLabel("Connect a camera or import an image to start.\nEvery snapshot is reviewed before it is saved.")
+        self.empty = QLabel("Connect a camera or import an image to start.\nCapture saves each page immediately. Select a saved page to edit it.")
         self.empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         for widget in (self.empty, self.video, self.preview):
             self.stack.addWidget(widget)
@@ -456,7 +456,7 @@ class ScanWindow(QMainWindow):
         self.capture_button.setStyleSheet("QPushButton:enabled { background: palette(highlight); color: palette(highlighted-text); font-weight: bold; }")
         self.zoom_in_button.setAccessibleName("Zoom in")
         self.zoom_out_button.setAccessibleName("Zoom out")
-        self.new_book_button.setShortcut("Ctrl+N")
+        self.install_shortcuts()
         self.session = QMediaCaptureSession(self)
         self.session.setVideoOutput(self.video)
         self.capture = QImageCapture(self)
@@ -475,6 +475,62 @@ class ScanWindow(QMainWindow):
         self.update_controls()
         if prompt and not self.library.books:
             self.choose_book()
+
+    def install_shortcuts(self):
+        bindings = [
+            (self.capture_button, "F6", "Capture and save / save edits or retry"),
+            (self.cancel_button, "Escape", "Cancel snapshot or page edits"),
+            (self.import_button, "Ctrl+O", "Import image"),
+            (self.live_button, "Ctrl+L", "Back to camera"),
+            (self.new_book_button, "Ctrl+N", "New book"),
+            (self.edit_book_button, "Ctrl+Shift+E", "Edit book"),
+            (self.remove_book_button, "Ctrl+Shift+Delete", "Delete book"),
+            (self.edit_page_button, "Ctrl+E", "Edit selected page"),
+            (self.remove_page_button, "Ctrl+Delete", "Delete selected page"),
+            (self.refresh_button, "F5", "Refresh cameras"),
+            (self.zoom_in_button, "Ctrl+=", "Zoom in"),
+            (self.zoom_out_button, "Ctrl+-", "Zoom out"),
+            (self.fit_button, "Ctrl+0", "Fit image"),
+            (self.rotate_left_button, "Ctrl+[", "Rotate left"),
+            (self.rotate_button, "Ctrl+]", "Rotate right"),
+            (self.crop_button, "Ctrl+R", "Start or cancel crop"),
+            (self.apply_crop_button, "Ctrl+Return", "Apply crop"),
+            (self.reset_button, "Ctrl+Backspace", "Reset edits"),
+            (self.export_button, "Ctrl+P", "Export books to PDF"),
+            (self.next_button, "Ctrl+Shift+N", "Next book"),
+            (self.done_button, "Ctrl+Q", "Save and quit"),
+            (self.auto_trim, "Ctrl+T", "Toggle auto-trim"),
+            (self.book_form.submit_button, "Alt+Return", "Create book / save book details"),
+            (self.book_form.cancel_button, "Alt+C", "Cancel book form"),
+            (self.book_form.browse_folder_button, "Alt+O", "Browse image folder"),
+            (self.book_form.default_folder_button, "Alt+D", "Use default folder"),
+        ]
+        self.shortcut_help = []
+        for button, keys, description in bindings:
+            button.setShortcut(QKeySequence(keys))
+            hint = f"{description} ({QKeySequence(keys).toString(QKeySequence.SequenceFormat.NativeText)})"
+            button.setToolTip(button.toolTip() + "\n" + hint if button.toolTip() else hint)
+            self.shortcut_help.append(f"{keys}: {description}")
+        self.keyboard_shortcuts = []
+        for keys, callback, description in [
+            ("Ctrl+S", self.capture_button.click, "Capture and save / save edits or retry"),
+            ("Alt+B", self.books.setFocus, "Focus books; use arrow keys"),
+            ("Alt+P", self.pages.setFocus, "Focus pages; use arrow keys"),
+            ("Alt+M", self.devices.setFocus, "Focus camera selector"),
+            ("F1", self.show_shortcuts, "Show keyboard shortcuts"),
+        ]:
+            shortcut = QShortcut(QKeySequence(keys), self)
+            shortcut.setAutoRepeat(False)
+            shortcut.activated.connect(callback)
+            self.keyboard_shortcuts.append(shortcut)
+            self.shortcut_help.append(f"{keys}: {description}")
+        help_menu = self.menuBar().addMenu("&Help")
+        help_menu.addAction("Keyboard shortcuts (F1)", self.show_shortcuts)
+
+    def show_shortcuts(self):
+        QMessageBox.information(self, "Keyboard shortcuts", "\n".join(self.shortcut_help) +
+                                "\n\nTab / Shift+Tab: move between controls. Arrow keys: select books and pages."
+                                "\nDrag with the mouse to select a crop or pan a zoomed image.")
 
     @staticmethod
     def button(text, callback, layout):
@@ -675,7 +731,7 @@ class ScanWindow(QMainWindow):
             return
         self.pages.clearSelection()
         self.stack.setCurrentWidget(self.video if self.camera else self.empty)
-        self.status.setText("Position a page, then capture. Click Save after reviewing each snapshot." if self.book else "Select a book or click New book to begin.")
+        self.status.setText("Position a page, then Capture (F6) to save it immediately." if self.book else "Select a book or click New book to begin.")
         self.update_controls()
 
     def update_controls(self, *_args):
@@ -762,6 +818,8 @@ class ScanWindow(QMainWindow):
         image = reader.read()
         Path(filename).unlink(missing_ok=True)
         self.present(image)
+        if not self.pending.isNull():
+            self.accept_page()
 
     def capture_error(self, capture_id, _code, message):
         if capture_id == self.capture_id:

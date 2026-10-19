@@ -212,8 +212,10 @@ def test_full_resolution_capture_and_cleanup(window, image, tmp_path):
     window.snapshot_saved(17, str(capture_path))
     assert window.capture_id is None
     assert not capture_path.exists()
-    assert window.pending.size() == image.size()
-    assert not window.book["pages"]
+    assert window.pending.isNull()
+    assert len(window.book["pages"]) == 1
+    stored = QImage(str(window.library.page_path(window.book["pages"][0])))
+    assert stored == image
 
 
 def test_cancel_inflight_capture_ignores_late_image(window, image, tmp_path):
@@ -423,7 +425,7 @@ def test_export_folder_cannot_contain_source_images(library, image):
         library.export_books(library.root / 'books' / book['id'])
 
 
-def test_one_button_captures_then_saves(window, image, tmp_path, monkeypatch):
+def test_one_click_captures_and_saves(window, image, tmp_path, monkeypatch):
     from types import SimpleNamespace
     window.book = window.library.add_book('Shared button')
     window.camera = SimpleNamespace(stop=lambda: None)
@@ -442,15 +444,12 @@ def test_one_button_captures_then_saves(window, image, tmp_path, monkeypatch):
     path = tmp_path / 'camera.png'
     image.save(str(path))
     window.snapshot_saved(7, str(path))
-    assert button.text() == 'Save'
-    assert button.isEnabled()
-    assert window.cancel_button.isEnabled()
-    button.click()
+    assert window.pending.isNull()
     assert len(window.book['pages']) == 1
     assert button.text() == 'Capture'
     assert button.isEnabled()
     assert not window.cancel_button.isEnabled()
-    assert len(calls) == 1  # The second click saved rather than capturing again.
+    assert len(calls) == 1  # No second click is needed to save.
 
 
 @pytest.fixture
@@ -1053,3 +1052,124 @@ def test_desktop_quote_rejects_injected_lines_and_escapes_literals():
     assert quoted.startswith('"') and quoted.endswith('"')
     assert '%%' in quoted
     assert '\\\\$' in quoted and '\\\\"' in quoted
+
+
+@pytest.mark.parametrize("trim", [False, True])
+def test_capture_autosaves_with_optional_trim(window, black_mat_image, tmp_path, trim):
+    from bookscan.imaging import black_background_rect
+    window.book = window.library.add_book("Automatic camera save")
+    window.auto_trim.setChecked(trim)
+    path = tmp_path / "still.png"
+    black_mat_image.save(str(path))
+    window.capture_id = 41
+    window.snapshot_saved(41, str(path))
+    assert window.pending.isNull()
+    assert len(window.book['pages']) == 1
+    stored = QImage(str(window.library.page_path(window.book['pages'][0])))
+    expected = black_mat_image.copy(black_background_rect(black_mat_image)) if trim else black_mat_image
+    assert stored == expected
+    assert len(Library(window.library.root).books[0]['pages']) == 1
+    window.snapshot_saved(41, str(path))  # Duplicate result cannot save twice.
+    assert len(window.book['pages']) == 1
+
+
+def test_capture_save_failure_can_retry_without_recapture(window, image, tmp_path, monkeypatch):
+    window.book = window.library.add_book("Retry")
+    path = tmp_path / "still.png"
+    image.save(str(path))
+    accept = window.library.accept
+    def fail(*args):
+        raise OSError("disk full")
+    monkeypatch.setattr(window.library, "accept", fail)
+    errors = []
+    monkeypatch.setattr(window, "error", errors.append)
+    window.capture_id = 42
+    window.snapshot_saved(42, str(path))
+    assert 'disk full' in errors[0]
+    assert window.pending == image
+    assert not window.book['pages']
+    assert window.capture_button.text() == 'Save'
+    monkeypatch.setattr(window.library, 'accept', accept)
+    window.capture_button.click()
+    assert len(window.book['pages']) == 1
+    assert window.pending.isNull()
+
+
+def test_keyboard_book_create_page_edit_save_and_navigation(window, image):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    window.show()
+    window.activateWindow()
+    QApplication.processEvents()
+    def press(key, modifiers=Qt.KeyboardModifier.ControlModifier):
+        QTest.keyClick(QApplication.focusWidget() or window, key, modifiers)
+        QTest.qWait(180)  # Qt animates shortcut-triggered button clicks.
+    press(Qt.Key.Key_N)
+    assert window.book_form.isVisible()
+    QTest.keyClicks(window.book_form.title, "Keyboard book")
+    press(Qt.Key.Key_Return, Qt.KeyboardModifier.AltModifier)
+    assert window.book['title'] == 'Keyboard book'
+    assert window.book_form.isHidden()
+    window.library.accept(window.book, image)
+    window.refresh_books()
+    press(Qt.Key.Key_P, Qt.KeyboardModifier.AltModifier)
+    assert window.pages.hasFocus()
+    press(Qt.Key.Key_Down, Qt.KeyboardModifier.NoModifier)
+    assert window.pages.currentRow() == 0
+    press(Qt.Key.Key_E)
+    assert window.editing_page == 0
+    press(Qt.Key.Key_BracketRight)
+    assert window.pending.size() == QSize(800, 600)
+    press(Qt.Key.Key_S)
+    assert window.pending.isNull()
+    assert len(window.book['pages']) == 1
+    assert QImage(str(window.library.page_path(window.book['pages'][0]))).size() == QSize(800, 600)
+    press(Qt.Key.Key_N, Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+    assert window.book_form.isVisible()
+    press(Qt.Key.Key_C, Qt.KeyboardModifier.AltModifier)
+    assert window.book_form.isHidden()
+
+
+def test_all_buttons_have_unique_accelerators_and_disabled_capture_is_safe(window, monkeypatch):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QPushButton
+    buttons = window.findChildren(QPushButton)
+    shortcuts = [button.shortcut().toString() for button in buttons]
+    assert all(shortcuts)
+    assert len(set(shortcuts)) == len(shortcuts)
+    assert all(button.toolTip() for button in buttons)
+    calls = []
+    monkeypatch.setattr(window, 'take_snapshot', lambda: calls.append('capture'))
+    window.show()
+    window.activateWindow()
+    QApplication.processEvents()
+    QTest.keyClick(window, Qt.Key.Key_S, Qt.KeyboardModifier.ControlModifier)
+    QTest.qWait(180)
+    assert not calls  # No selected book / ready camera.
+
+
+@pytest.mark.parametrize('key,control', [('F6', False), ('S', True)])
+def test_keyboard_capture_saves_without_second_press(window, image, tmp_path, monkeypatch, key, control):
+    from types import SimpleNamespace
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    window.book = window.library.add_book('Keyboard capture')
+    window.camera = SimpleNamespace(stop=lambda: None)
+    monkeypatch.setattr(window.capture, 'isReadyForCapture', lambda: True)
+    path = tmp_path / 'camera.png'
+    image.save(str(path))
+    def capture(filename):
+        QTimer.singleShot(0, lambda: window.snapshot_saved(73, str(path)))
+        return 73
+    monkeypatch.setattr(window.capture, 'captureToFile', capture)
+    window.update_controls()
+    window.show()
+    window.activateWindow()
+    QApplication.processEvents()
+    QTest.keyClick(window, Qt.Key.Key_S if control else Qt.Key.Key_F6,
+                   Qt.KeyboardModifier.ControlModifier if control else Qt.KeyboardModifier.NoModifier)
+    QTest.qWait(200)
+    assert len(window.book['pages']) == 1
+    assert window.pending.isNull()
+    assert window.capture_id is None

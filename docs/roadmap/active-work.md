@@ -110,3 +110,27 @@ queue item or let `docs/roadmap/` become a plan archive.
   Gio launch probe succeeds with an executable path containing spaces. The full
   regression suite and retained harness each pass 83 tests. The desktop launcher
   is installed for the current user; `litai verify` passes all four configured gates.
+
+### [x] BOOKSCAN-004 — One-step capture and keyboard operation
+
+- **Priority:** high
+- **Owner:** components/legacy-project-wrapper
+- **Direction:** Combine capture and save; provide keyboard accelerators for button actions.
+- **Conclusion:** Camera captures save immediately after optional auto-trim; saved-page editing and imports retain explicit Save, and failed saves retain retryable images. Provide visible shortcut help, button hints and keyboard navigation without unmodified typing keys.
+- **Depends on:** none
+- **Implementation:**
+  - [x] Implement automatic camera save and update workflow guidance.
+  - [x] Add shortcuts for every button action and keyboard navigation/help.
+  - [x] Update regression coverage and retained-source evidence.
+- **Evidence:**
+  - [x] Single-step captures, cancellation, failed-save recovery and keyboard interactions pass regression/smoke checks.
+  - [x] Retained harness, CodeGraph source intelligence and litai verify pass.
+
+- **Results:** The full regression/smoke suite and disposable retained harness each
+  pass 90 tests. Coverage includes full-resolution automatic capture persistence,
+  optional trimming, duplicate/late results, cancelled captures, failed-save retry,
+  keyboard-only book creation and page editing, both capture accelerators, and
+  unique button shortcuts. The 1180×800 Qt layout was inspected. CodeGraph is
+  current and `litai verify` passes all four configured gates; HTML observability
+  is not configured. This change uses simulated camera callbacks; a fresh hardware
+  capture was not performed. `verification/current.json` records current evidence.

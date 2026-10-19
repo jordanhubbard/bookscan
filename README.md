@@ -40,12 +40,14 @@ To choose a different library folder:
    **Browse…** (or a manually entered path) overrides the exact destination; changing
    the title then leaves your choice alone. **Use default** restores the automatic
    destination. The app remembers the actual folder when you resume the book.
-2. Select your camera and position the page in the live view. Click **Capture**, or use **Import image** to load an existing photograph.
-3. The **Capture** button becomes **Save** when the snapshot is ready. Review it,
-   then click that same button again to save it to the book. **Cancel**, immediately
-   beside it, discards the snapshot and returns to capture mode. Cancel also
-   abandons an in-progress capture; a late camera result will not be saved.
-   **Rotate left** / **Rotate right** turn the snapshot in 90° steps.
+2. Select your camera and position the page in the live view. Click **Capture**
+   (F6 or Ctrl+S) to capture and save immediately, then turn the page and repeat.
+   Optional auto-trim runs before saving. **Cancel** (Escape) can abandon an
+   in-progress capture; late camera results are discarded.
+3. Select a saved page and use **Edit page** (Ctrl+E) to rotate or crop it, then
+   **Save** (Ctrl+S). **Import image** (Ctrl+O) opens an existing photograph for
+   review and editing before Save. If automatic saving fails, the image stays
+   available so Save retries without taking another picture.
 4. Use **Crop**, drag around the area to keep, then **Apply crop**. **Cancel crop**
    leaves the snapshot unchanged. **Reset edits** restores the original snapshot,
    including any area removed by cropping, until you save or cancel it.
@@ -54,8 +56,9 @@ To choose a different library folder:
    to pan. Zoom works on saved-page previews too; it does not change saved pixels.
 6. Optionally enable **Auto-trim black background** before capturing or importing.
    It detects the nonblack page area, removes surrounding black mat, and keeps a
-   small margin. Trimming uses original-resolution pixels. Review the result;
-   **Reset edits** restores the full snapshot. Detection requires a mostly black
+   small margin. Trimming uses original-resolution pixels. Camera captures save the trimmed
+   result immediately. For imported images and unsaved edits, **Reset edits**
+   restores the image from the start of that editing session. Detection requires a mostly black
    outer border and leaves ambiguous images unchanged. Dark pages, shadows, or
    uneven backgrounds may need manual cropping. This is rectangular trimming;
    it does not straighten perspective or curved pages.
@@ -92,8 +95,8 @@ A lock prevents two app instances from editing the same library simultaneously.
 Camera snapshots use Qt's saved still image, preserving the full captured
 resolution rather than saving the viewfinder thumbnail. Resolution and camera
 compatibility depend on the device and Qt backend. Camera capture temporarily
-writes an unapproved image to the system temporary directory; it is deleted after
-loading the preview or on a normal exit. Approved images are saved as PNG without
+writes the still image to the system temporary directory; it is deleted after
+loading or on a normal exit. Captured pages are saved as PNG without
 additional JPEG recompression. If a camera itself returns JPEG, that original
 compression remains. Import also honors image orientation metadata.
 
@@ -184,3 +187,30 @@ exactly; the application does not rename its parent directories.
 On Linux, `make install` installs the application icon and a per-user desktop
 launcher. BookScan then appears in the desktop applications menu. The same icon
 is bundled with the Python package and used for Qt application windows.
+
+## Keyboard operation
+
+Press **F1** or open **Help → Keyboard shortcuts** for the full list. Each button
+also shows its accelerator in its tooltip. Tab / Shift+Tab moves between controls;
+Space activates the focused button. Alt+B focuses books, Alt+P focuses pages,
+and Alt+M focuses the camera selector; arrow keys change the selection.
+
+| Action | Shortcut |
+| --- | --- |
+| Capture and save; save edits / retry | F6 or Ctrl+S |
+| Cancel snapshot / edits; back to camera | Escape; Ctrl+L |
+| New book; next book | Ctrl+N; Ctrl+Shift+N |
+| Create / save book form; cancel form | Alt+Enter; Alt+C |
+| Browse folder; restore default | Alt+O; Alt+D |
+| Edit book; delete book | Ctrl+Shift+E; Ctrl+Shift+Delete |
+| Edit page; delete page | Ctrl+E; Ctrl+Delete |
+| Import; refresh cameras | Ctrl+O; F5 |
+| Toggle auto-trim | Ctrl+T |
+| Rotate left / right | Ctrl+[ / Ctrl+] |
+| Crop / cancel crop; apply crop | Ctrl+R; Ctrl+Enter |
+| Reset edits | Ctrl+Backspace |
+| Zoom in / out; fit | Ctrl+= / Ctrl+-; Ctrl+0 |
+| Export PDFs; save and quit | Ctrl+P; Ctrl+Q |
+
+Crop selection and dragging to pan use the mouse. Deletion still requires
+confirmation, and unavailable actions stay disabled for keyboard use too.

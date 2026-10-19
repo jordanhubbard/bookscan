@@ -20,3 +20,7 @@
 - BookScan: added an original book-and-scanner application icon, bundled it in
   Python wheels, and applied it to Qt windows. `make install` creates a per-user
   Linux desktop launcher with the same icon and matching Wayland application ID.
+
+- BookScan: Capture now saves immediately after optional trimming; failed saves retain
+  the image for retry. Added accelerators for all buttons, keyboard focus navigation,
+  shortcut tooltips and F1 help. Saved pages remain editable with explicit Save.
