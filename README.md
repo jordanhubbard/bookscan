@@ -121,6 +121,7 @@ metadata; they do not apply different image processing.
 
 ```sh
 make check
+make smoke
 ```
 
 Tests exercise Qt widgets offscreen, Capture/Save/Cancel state, auto-trim, book isolation,
@@ -134,3 +135,13 @@ interaction and other cameras/platforms have not been verified.
 
 Camera integration follows Qt's [QImageCapture](https://doc.qt.io/qtforpython-6/PySide6/QtMultimedia/QImageCapture.html)
 and [QMediaCaptureSession](https://doc.qt.io/qtforpython-6/PySide6/QtMultimedia/QMediaCaptureSession.html) APIs.
+
+The smoke target runs a complete camera-independent Qt session against temporary
+books and files: create two books, import/save pages, edit a saved page, export one
+PDF per book, reopen the library, and close cleanly. It also checks the CLI entry
+point. It never opens your real library or claims to qualify physical camera input.
+
+Developer setup includes the pinned CodeGraph 1.6.2 source-intelligence tool through
+`make deps-tools` (also part of `make deps`). It installs into the user-local npm
+prefix by default; keep its `bin` directory on PATH. CodeGraph is development
+tooling, not a runtime dependency of the scanning application.
