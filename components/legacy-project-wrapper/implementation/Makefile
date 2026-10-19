@@ -1,4 +1,4 @@
-.PHONY: all deps deps-tools run check smoke
+.PHONY: all deps deps-tools run check smoke install
 CODEGRAPH_VERSION := 1.6.2
 NPM_PREFIX ?= $(HOME)/.local
 PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
@@ -20,3 +20,6 @@ check:
 
 smoke:
 	QT_QPA_PLATFORM=offscreen $(PYTHON) -m pytest -q tests/test_smoke.py
+
+install:
+	$(PYTHON) -m bookscan --install-desktop

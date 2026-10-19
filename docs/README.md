@@ -44,3 +44,5 @@ explicit parent change.
 ## Adoption decisions
 
 - [Legacy project lift-and-shift decision](decisions/0001-legacy-project-lift-and-shift.md)
+
+- [BookScan application icon and generation notes](design/icon.md)

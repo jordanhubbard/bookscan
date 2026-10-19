@@ -1,5 +1,7 @@
 # BookScan
 
+<img src="components/legacy-project-wrapper/implementation/bookscan/assets/bookscan.png" alt="BookScan application icon" width="128" />
+
 A native Qt 6 application for scanning and organizing books with a camera or USB
 document camera. Built with Python and PySide6; images remain on your computer.
 
@@ -178,3 +180,7 @@ Generated folder components follow the conservative subset of Microsoft's
 [Naming Files, Paths, and Namespaces](https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file)
 rules described above. A Browse override preserves the selected existing folder
 exactly; the application does not rename its parent directories.
+
+On Linux, `make install` installs the application icon and a per-user desktop
+launcher. BookScan then appears in the desktop applications menu. The same icon
+is bundled with the Python package and used for Qt application windows.

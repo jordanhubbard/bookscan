@@ -86,3 +86,27 @@ queue item or let `docs/roadmap/` become a plan archive.
   was inspected at 1180×800. `verification/current.json` is current; `litai verify`
   passes authority, locks, source intelligence, and receipt gates. Native Windows
   execution was not performed; portable-name rules have explicit fixtures.
+
+### [x] BOOKSCAN-003 — BookScan application icon and desktop integration
+
+- **Priority:** medium
+- **Owner:** components/legacy-project-wrapper
+- **Direction:** Create a good application icon for BookScan.
+- **Conclusion:** Create one distinctive book-and-scanner icon, package it with the application, use it in Qt windows and provide a desktop launcher using the same asset.
+- **Depends on:** none
+- **Implementation:**
+  - [x] Generate and inspect the application icon and save it inside the package.
+  - [x] Wire the packaged icon into Qt and installable desktop integration.
+  - [x] Verify icon inclusion, smoke tests and refreshed retained-source evidence.
+- **Evidence:**
+  - [x] Icon is legible at small sizes and packaged application/window/desktop references resolve.
+  - [x] Regression/smoke checks and litai verification pass.
+
+- **Results:** Built-in image generation produced the final transparent PNG; its
+  source, exact prompt, and provenance are documented in `docs/design/icon.md`.
+  The icon was inspected at 32/64/128 px on light and dark backgrounds. The built
+  wheel includes both the PNG and desktop integration module. Qt icon sizes,
+  display-free installation, desktop entry validation and quoting pass; a native
+  Gio launch probe succeeds with an executable path containing spaces. The full
+  regression suite and retained harness each pass 83 tests. The desktop launcher
+  is installed for the current user; `litai verify` passes all four configured gates.

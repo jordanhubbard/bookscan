@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -993,3 +994,62 @@ def test_new_named_folder_failure_rolls_back_reservation(library, monkeypatch):
         library.add_book('Do not reserve forever')
     assert not library.books
     assert not (library.root / 'books' / 'do-not-reserve-forever').exists()
+
+
+def test_packaged_application_icon_is_transparent_and_visible_at_small_sizes(window):
+    from bookscan.desktop import ICON_PATH
+    image = QImage(str(ICON_PATH))
+    assert not image.isNull()
+    assert image.width() == image.height() and image.width() >= 512
+    assert image.hasAlphaChannel()
+    assert image.pixelColor(0, 0).alpha() == 0
+    assert not window.windowIcon().isNull()
+    for size in (16, 32, 48, 128, 256):
+        pixmap = window.windowIcon().pixmap(size, size)
+        assert not pixmap.isNull()
+        assert pixmap.width() == size and pixmap.height() == size
+
+
+@pytest.mark.skipif(not sys.platform.startswith('linux'), reason='Linux desktop integration')
+def test_linux_desktop_install_uses_packaged_icon_and_active_python(tmp_path):
+    from bookscan.desktop import ICON_PATH, install_desktop
+    import shutil
+    import subprocess
+    destination = tmp_path / 'Application data'
+    interpreter = tmp_path / 'Python environment' / 'bin' / 'python'
+    desktop = install_desktop(destination, interpreter)
+    contents = desktop.read_text()
+    assert desktop == destination / 'applications' / 'bookscan.desktop'
+    assert f'Exec="{interpreter}" -m bookscan' in contents
+    installed_icon = destination / 'pixmaps' / 'bookscan.png'
+    assert f'Icon={installed_icon}' in contents
+    assert installed_icon.read_bytes() == ICON_PATH.read_bytes()
+    assert 'Terminal=false' in contents
+    if shutil.which('desktop-file-validate'):
+        subprocess.run(['desktop-file-validate', str(desktop)], check=True,
+                       capture_output=True, text=True)
+
+
+@pytest.mark.skipif(not sys.platform.startswith('linux'), reason='Linux desktop integration')
+def test_desktop_install_cli_does_not_require_a_display(tmp_path):
+    import subprocess
+    import sys
+    environment = os.environ.copy()
+    environment.pop('DISPLAY', None)
+    environment.pop('WAYLAND_DISPLAY', None)
+    environment['XDG_DATA_HOME'] = str(tmp_path / 'user-data')
+    result = subprocess.run([sys.executable, '-m', 'bookscan', '--install-desktop'],
+                            capture_output=True, text=True, env=environment, timeout=15)
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / 'user-data/applications/bookscan.desktop').exists()
+    assert str(tmp_path / 'user-data/applications/bookscan.desktop') in result.stdout
+
+
+def test_desktop_quote_rejects_injected_lines_and_escapes_literals():
+    from bookscan.desktop import desktop_exec_argument
+    with pytest.raises(ValueError):
+        desktop_exec_argument('/tmp/python\nExec=other-command')
+    quoted = desktop_exec_argument('/tmp/with space/$quote"percent%/python')
+    assert quoted.startswith('"') and quoted.endswith('"')
+    assert '%%' in quoted
+    assert '\\\\$' in quoted and '\\\\"' in quoted

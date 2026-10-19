@@ -15,5 +15,8 @@ bookscan = "bookscan.app:main"
 [tool.setuptools.packages.find]
 include = ["bookscan*"]
 
+[tool.setuptools.package-data]
+bookscan = ["assets/*.png"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

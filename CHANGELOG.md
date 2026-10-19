@@ -16,3 +16,7 @@
   instead of opaque IDs. The destination updates while typing; Browse and manual
   paths override it exactly, and Use default restores automatic naming. Existing
   books keep their image locations.
+
+- BookScan: added an original book-and-scanner application icon, bundled it in
+  Python wheels, and applied it to Qt windows. `make install` creates a per-user
+  Linux desktop launcher with the same icon and matching Wayland application ID.

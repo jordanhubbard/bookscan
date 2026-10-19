@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from .library import Library
 from .imaging import black_background_rect
+from .desktop import ICON_PATH, install_desktop
 
 
 class BookForm(QGroupBox):
@@ -335,6 +336,7 @@ class ScanWindow(QMainWindow):
         self.thumbnails = {}
         self.temp = tempfile.TemporaryDirectory(prefix="bookscan-")
         self.setWindowTitle("BookScan — Scan your library")
+        self.setWindowIcon(QIcon(str(ICON_PATH)))
         self.resize(1180, 800)
         central = QWidget()
         self.setCentralWidget(central)
@@ -960,9 +962,19 @@ class ScanWindow(QMainWindow):
 def main():
     parser = argparse.ArgumentParser(description="Scan and organize books with a camera and Qt")
     parser.add_argument("--library", type=Path, help="Library folder (default: Documents/BookScan)")
+    parser.add_argument("--install-desktop", action="store_true", help="Install the application icon and launcher for this Linux user")
     args = parser.parse_args()
+    if args.install_desktop:
+        try:
+            print(install_desktop())
+            return 0
+        except (OSError, ValueError) as exc:
+            print(f"Cannot install BookScan desktop launcher: {exc}", file=sys.stderr)
+            return 1
     app = QApplication(sys.argv[:1])
     app.setApplicationName("BookScan")
+    app.setDesktopFileName("bookscan")
+    app.setWindowIcon(QIcon(str(ICON_PATH)))
     app.setOrganizationName("BookScan")
     root = args.library or Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)) / "BookScan"
     try:

@@ -1,7 +1,7 @@
 # Developer entry points for the retained BookScan implementation.
 IMPL := components/legacy-project-wrapper/implementation
 PYTHON ?= $(if $(wildcard .venv/bin/python),$(abspath .venv/bin/python),python3)
-.PHONY: all deps deps-tools run check smoke verify
+.PHONY: all deps deps-tools run check smoke verify install
 all: check
 
 deps: deps-tools
@@ -22,3 +22,6 @@ smoke:
 
 verify:
 	litai verify
+
+install:
+	$(PYTHON) -m bookscan --install-desktop
