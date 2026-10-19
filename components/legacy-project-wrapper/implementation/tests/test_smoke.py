@@ -59,7 +59,9 @@ def test_desktop_session_smoke(smoke_app, tmp_path, monkeypatch):
         window.import_button.click()
         window.capture_button.click()
         output = tmp_path / 'first-book.pdf'
-        monkeypatch.setattr(QFileDialog, 'getExistingDirectory', lambda *args: str(library.image_folder(first)))
+        window.books.setCurrentRow(0)
+        assert window.book is first
+        monkeypatch.setattr(QFileDialog, 'getExistingDirectory', lambda *args: pytest.fail('Selected book already has an image folder'))
         monkeypatch.setattr(QFileDialog, 'getSaveFileName', lambda *args, **kwargs: (str(output), 'PDF files (*.pdf)'))
         window.export_button.click()
         assert 'all 2 pages' in window.status.text()

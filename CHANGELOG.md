@@ -29,3 +29,7 @@
   Ctrl+Shift+R refreshes cameras, and Ctrl+H opens shortcut help. PDF export now
   chooses one registered book folder and one destination PDF, including all saved
   pages in order, with cancellation and overwrite confirmation.
+
+- BookScan: PDF export now derives its source from the selected sidebar book and
+  asks only for the output PDF. The default filename is inside that book's image
+  folder; all its saved pages are included in order, including with shared folders.

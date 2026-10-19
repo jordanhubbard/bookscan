@@ -68,16 +68,16 @@ To choose a different library folder:
    existing book in the sidebar. **Done — save and quit** saves the
    library and exits. If a snapshot is awaiting review, choose whether to save,
    discard, or cancel. Saved pages remain on disk even if the app crashes.
-9. **Export book to PDF** (Ctrl+P) asks you to choose one book's image folder,
-   then opens a Save As dialog for the output PDF filename and location. The chooser
-   starts at the current book's folder, and you can choose another book in this
-   library. All saved pages of that book are included, in their saved order, one
-   image per PDF page. Other books and unrelated files in the folder are excluded.
-   You can save the PDF alongside its images or elsewhere; existing PDFs require
-   confirmation before replacement. Missing pages produce an error and leave any
-   existing output unchanged. Cancelling either chooser exports nothing.
-   Empty, unknown, or shared book folders are reported rather than exporting a
-   different book or the entire library.
+9. Select a book in the sidebar, then **Export book to PDF** (Ctrl+P) opens
+   a Save As dialog for the output PDF filename and location. The source images
+   come directly from that selected book; no image-folder chooser is needed.
+   The suggested output is `<book-image-folder>/<safe-book-title>.pdf`, and you
+   can choose any other output location. All saved pages of the selected book
+   are included in order, one image per PDF page. Other books and unrelated
+   images in the folder are excluded, even if books share an image folder.
+   Existing PDFs require confirmation before replacement. Missing pages produce
+   an error and leave existing output unchanged. Cancelling exports nothing.
+   Export is disabled when no book is selected or the selected book has no pages.
 
 The default library is `Documents/BookScan` (using Qt's platform Documents
 location). `library.json` holds book metadata and ordered page references;

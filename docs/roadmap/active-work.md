@@ -159,3 +159,27 @@ queue item or let `docs/roadmap/` become a plan archive.
   folders, and safe output alongside images. Source images remain protected.
   CodeGraph is current; `verification/current.json` records current evidence and
   `litai verify` passes all four configured gates (HTML is not configured).
+
+### [x] BOOKSCAN-006 — Derive PDF export source from selected book
+
+- **Priority:** high
+- **Owner:** components/legacy-project-wrapper
+- **Direction:** Screenshot shows selected book folder is not used by PDF export.
+- **Conclusion:** The selected sidebar book already owns an exact image folder and ordered pages. Export must use that book directly, skip redundant source-folder selection, and ask only for the PDF output filename/location. Require a nonempty selected book.
+- **Depends on:** none
+- **Implementation:**
+  - [x] Use selected book as export authority and derive PDF default path from its folder.
+  - [x] Update export UI tests, smoke workflow and user documentation.
+- **Evidence:**
+  - [x] Selected-book export, full ordered contents, disabled empty selection, cancellation and overwrite tests pass.
+  - [x] Current retained receipt, CodeGraph and litai verify pass.
+
+- **Results:** A native desktop screenshot confirmed the selected book's correct
+  image folder was already displayed while the redundant export folder chooser
+  caused the error. Export now uses the sidebar selection, including shared
+  image folders, and suggests `<image-folder>/<safe-title>.pdf`. Full regression,
+  smoke and disposable retained harness each pass 97 checks. Tests cover default
+  and custom image folders, sidebar selection changes, ordered complete PDFs,
+  shared folders without cross-book inclusion, disabled empty selection, Save As
+  cancellation and overwrite confirmation. CodeGraph is current and `litai verify`
+  passes all four configured gates; HTML observability is not configured.

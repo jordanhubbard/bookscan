@@ -455,7 +455,7 @@ class ScanWindow(QMainWindow):
         self.location.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         footer.addWidget(self.location, 1)
         self.export_button = self.button("Export book to PDF…", self.export_pdf, footer)
-        self.export_button.setToolTip("Choose one book folder and export all its saved pages to a PDF file")
+        self.export_button.setToolTip("Export all saved pages of the selected book; choose the output PDF file")
         self.next_button = self.button("Next book", self.choose_book, footer)
         self.done_button = self.button("Done — save and quit", self.close, footer)
         layout.addLayout(footer)
@@ -774,7 +774,7 @@ class ScanWindow(QMainWindow):
         self.edit_page_button.setEnabled(page_selected and not pending and not busy)
         self.remove_page_button.setEnabled(page_selected and not pending and not busy)
         self.done_button.setEnabled(not busy)
-        self.export_button.setEnabled(any(book["pages"] for book in self.library.books) and not busy and not pending)
+        self.export_button.setEnabled(bool(self.book and self.book["pages"]) and not busy and not pending)
 
     def capture_or_save(self):
         if self.capture_id is not None:
@@ -974,15 +974,12 @@ class ScanWindow(QMainWindow):
     def export_pdf(self):
         if not self.pending.isNull() or self.capture_id is not None:
             return
-        initial = self.library.image_folder(self.book) if self.book else self.library.root / "books"
-        folder = QFileDialog.getExistingDirectory(self, "Choose book image folder to export", str(initial))
-        if not folder:
+        book = self.book
+        if book is None or not book['pages']:
+            self.status.setText("Select a book with saved pages to export.")
             return
         try:
-            book = self.library.book_in_folder(folder)
-            if not book['pages']:
-                raise ValueError("This book has no saved pages to export.")
-            default = Path(folder).parent / f"{portable_book_name(book['title'])}.pdf"
+            default = self.library.image_folder(book) / f"{portable_book_name(book['title'])}.pdf"
             filename, _ = QFileDialog.getSaveFileName(
                 self, f"Export {book['title']} — all {len(book['pages'])} pages", str(default),
                 "PDF files (*.pdf)", options=QFileDialog.Option.DontConfirmOverwrite)

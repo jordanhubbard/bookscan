@@ -219,16 +219,6 @@ class Library:
             raise
         return relative
 
-    def book_in_folder(self, folder):
-        """Resolve one registered book by its exact image folder, never its parent."""
-        folder = Path(folder).expanduser().resolve()
-        matches = [book for book in self.books if self.image_folder(book).resolve() == folder]
-        if not matches:
-            raise ValueError("Choose an image folder associated with a book in this library.")
-        if len(matches) != 1:
-            raise ValueError("Multiple books use this folder. Give each book its own image folder before exporting.")
-        return matches[0]
-
     def pdf_exports(self, folder):
         """Plan distinct, stable filenames for every nonempty book."""
         folder = Path(folder).expanduser().resolve()

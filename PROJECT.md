@@ -4,7 +4,7 @@
 
 Provide a Qt desktop workflow for scanning and organizing books: one-step capture and save,
 optional black-background trimming, image editing, book folders, page and book
-management, and single-book PDF export with explicit book-folder and output-file selection. New books use portable title-based
+management, and single-book PDF export with selected-book source and explicit output-file selection. New books use portable title-based
 image subfolders with a live destination preview and exact Browse override. Preserve user scans across sessions.
 
 ## Dependencies
@@ -38,3 +38,6 @@ BOOKSCAN-004 adds immediate capture saving and full button keyboard accelerators
 
 BOOKSCAN-005 makes every shortcut usable without function keys and replaces batch
 export UI with one chosen book folder and one output PDF containing all saved pages.
+
+BOOKSCAN-006 derives PDF source and default output path from the selected book,
+removing the redundant source-folder chooser.
