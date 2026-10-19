@@ -145,3 +145,22 @@ Developer setup includes the pinned CodeGraph 1.6.2 source-intelligence tool thr
 `make deps-tools` (also part of `make deps`). It installs into the user-local npm
 prefix by default; keep its `bin` directory on PATH. CodeGraph is development
 tooling, not a runtime dependency of the scanning application.
+
+## Literate AI development
+
+BookScan is an adopted Literate AI project. Original application source remains
+authoritative in `components/legacy-project-wrapper/implementation/`; application
+source is retained, not regenerated. The root Makefile keeps `make deps`, `make run`,
+`make check`, and `make smoke` available. The root `.venv` is a local Python environment created by `make deps`,
+never repository content.
+
+Use `litai status` and `litai verify` to inspect project authority and current test
+evidence. `litai project test-receipt run-retained` runs the admitted retained
+harness in a disposable source copy; publish its candidate with
+`litai project test-receipt update`. Follow `SKILL.md` for future changes and refresh
+retained source membership when adding or removing source files. CodeGraph 1.6.2
+is installed and selected as this project's source-intelligence provider.
+
+<!-- literate-ai:parent-repositories -->
+- Parent repository: [github.com/jordanhubbard/literate-ai](<https://github.com/jordanhubbard/literate-ai>)
+<!-- /literate-ai:parent-repositories -->

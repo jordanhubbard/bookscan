@@ -15,13 +15,14 @@ dependency for source navigation, not a prerequisite for running the desktop app
 ## Completeness
 
 The existing Python application implements the scanning workflow, inline book forms,
-rotation/cropping/zoom, folders, deletion confirmations and PDF export. Its regression
-suite currently contains 52 checks. End-to-end smoke and Literate AI adoption are in
-progress; hardware coverage is limited to the previously tested NETUM USB camera.
+rotation/cropping/zoom, folders, deletion confirmations and PDF export. Its regression and smoke
+suite contains 54 checks. Literate AI adoption is complete at the retained-source stage, with a current
+54-test receipt and four passing verification gates; hardware coverage is limited to the previously tested NETUM USB camera.
 
 ## Current work
 
-See [active work](docs/roadmap/active-work.md).
+See [active work](docs/roadmap/active-work.md). BOOKSCAN-001 is complete. Native
+regeneration remains a separate, deferred program; existing source is authoritative.
 
 ## Completed work
 
