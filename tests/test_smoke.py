@@ -1,0 +1,86 @@
+"""One camera-independent desktop session, using only disposable books and files."""
+import os
+import subprocess
+import sys
+
+os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
+
+import pytest
+from PySide6.QtCore import QCoreApplication, QEvent
+from PySide6.QtGui import QImage
+from PySide6.QtPdf import QPdfDocument
+from PySide6.QtWidgets import QApplication, QFileDialog
+
+from bookscan.app import ScanWindow
+from bookscan.library import Library
+
+
+@pytest.fixture(scope='session')
+def smoke_app():
+    return QApplication.instance() or QApplication([])
+
+
+def test_desktop_session_smoke(smoke_app, tmp_path, monkeypatch):
+    # Disable physical-device discovery; input is a real PNG in a temporary folder.
+    monkeypatch.setattr(ScanWindow, 'refresh_cameras', lambda self: None)
+    library = Library(tmp_path / 'library')
+    window = ScanWindow(library)
+    window.show()
+    try:
+        smoke_app.processEvents()
+        assert window.book_form.isVisible()
+        assert QApplication.activeModalWidget() is None
+        window.book_form.title.setText('First smoke book')
+        window.book_form.folder.setText(str(tmp_path / 'scans'))
+        window.book_form.submit_button.click()
+        first = window.book
+        assert first['title'] == 'First smoke book'
+        image = QImage(240, 320, QImage.Format.Format_RGB32)
+        image.fill('white')
+        incoming = tmp_path / 'incoming.png'
+        assert image.save(str(incoming))
+        monkeypatch.setattr(QFileDialog, 'getOpenFileName', lambda *args: (str(incoming), 'Images'))
+        for _ in range(2):
+            window.import_button.click()
+            assert window.capture_button.text() == 'Save'
+            window.capture_button.click()
+            assert window.capture_button.text() == 'Capture'
+        window.pages.setCurrentRow(0)
+        window.edit_page_button.click()
+        window.rotate_button.click()
+        window.capture_button.click()
+        assert len(first['pages']) == 2
+        window.new_book_button.click()
+        window.book_form.title.setText('Second smoke book')
+        window.book_form.submit_button.click()
+        window.import_button.click()
+        window.capture_button.click()
+        output = tmp_path / 'pdfs'
+        output.mkdir()
+        monkeypatch.setattr(QFileDialog, 'getExistingDirectory', lambda *args: str(output))
+        window.export_button.click()
+        assert 'Exported 2 PDF(s)' in window.status.text()
+        reopened = Library(library.root)
+        assert [len(book['pages']) for book in reopened.books] == [2, 1]
+        for book, pdf in reopened.pdf_exports(output):
+            document = QPdfDocument()
+            assert document.load(str(pdf)) == QPdfDocument.Error.None_
+            assert document.pageCount() == len(book['pages'])
+            if book['title'] == first['title']:
+                assert document.pagePointSize(0).width() > document.pagePointSize(0).height()
+            document.close()
+        assert len(list((tmp_path / 'scans').glob('*.png'))) == 2
+        window.done_button.click()
+        assert not window.isVisible()
+    finally:
+        window.pending = QImage()
+        window.close()
+        window.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+
+
+def test_cli_entrypoint_smoke():
+    result = subprocess.run([sys.executable, '-m', 'bookscan', '--help'],
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    assert '--library' in result.stdout
