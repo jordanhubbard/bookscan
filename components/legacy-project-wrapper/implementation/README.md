@@ -41,7 +41,7 @@ To choose a different library folder:
    the title then leaves your choice alone. **Use default** restores the automatic
    destination. The app remembers the actual folder when you resume the book.
 2. Select your camera and position the page in the live view. Click **Capture**
-   (F6 or Ctrl+S) to capture and save immediately, then turn the page and repeat.
+   (Ctrl+S) to capture and save immediately, then turn the page and repeat.
    Optional auto-trim runs before saving. **Cancel** (Escape) can abandon an
    in-progress capture; late camera results are discarded.
 3. Select a saved page and use **Edit page** (Ctrl+E) to rotate or crop it, then
@@ -68,13 +68,16 @@ To choose a different library folder:
    existing book in the sidebar. **Done — save and quit** saves the
    library and exits. If a snapshot is awaiting review, choose whether to save,
    discard, or cancel. Saved pages remain on disk even if the app crashes.
-9. **Export books to PDF** asks for a destination folder and generates one PDF
-   per book in the library. Each PDF contains all saved images for that book in
-   page order, one image per PDF page. Empty books are skipped. Filenames include
-   the book title and an identifier so books with the same title stay separate.
-   Exporting again asks before replacing existing PDFs. If a book cannot be
-   exported, the app identifies it and still exports the other books. You can
-   reopen BookScan later to resume scanning or export again.
+9. **Export book to PDF** (Ctrl+P) asks you to choose one book's image folder,
+   then opens a Save As dialog for the output PDF filename and location. The chooser
+   starts at the current book's folder, and you can choose another book in this
+   library. All saved pages of that book are included, in their saved order, one
+   image per PDF page. Other books and unrelated files in the folder are excluded.
+   You can save the PDF alongside its images or elsewhere; existing PDFs require
+   confirmation before replacement. Missing pages produce an error and leave any
+   existing output unchanged. Cancelling either chooser exports nothing.
+   Empty, unknown, or shared book folders are reported rather than exporting a
+   different book or the entire library.
 
 The default library is `Documents/BookScan` (using Qt's platform Documents
 location). `library.json` holds book metadata and ordered page references;
@@ -171,27 +174,27 @@ is bundled with the Python package and used for Qt application windows.
 
 ## Keyboard operation
 
-Press **F1** or open **Help → Keyboard shortcuts** for the full list. Each button
+Press **Ctrl+H** or open **Help → Keyboard shortcuts** for the full list. Each button
 also shows its accelerator in its tooltip. Tab / Shift+Tab moves between controls;
 Space activates the focused button. Alt+B focuses books, Alt+P focuses pages,
 and Alt+M focuses the camera selector; arrow keys change the selection.
 
 | Action | Shortcut |
 | --- | --- |
-| Capture and save; save edits / retry | F6 or Ctrl+S |
+| Capture and save; save edits / retry | Ctrl+S |
 | Cancel snapshot / edits; back to camera | Escape; Ctrl+L |
 | New book; next book | Ctrl+N; Ctrl+Shift+N |
 | Create / save book form; cancel form | Alt+Enter; Alt+C |
 | Browse folder; restore default | Alt+O; Alt+D |
 | Edit book; delete book | Ctrl+Shift+E; Ctrl+Shift+Delete |
 | Edit page; delete page | Ctrl+E; Ctrl+Delete |
-| Import; refresh cameras | Ctrl+O; F5 |
+| Import; refresh cameras | Ctrl+O; Ctrl+Shift+R |
 | Toggle auto-trim | Ctrl+T |
 | Rotate left / right | Ctrl+[ / Ctrl+] |
 | Crop / cancel crop; apply crop | Ctrl+R; Ctrl+Enter |
 | Reset edits | Ctrl+Backspace |
 | Zoom in / out; fit | Ctrl+= / Ctrl+-; Ctrl+0 |
-| Export PDFs; save and quit | Ctrl+P; Ctrl+Q |
+| Export book PDF; save and quit | Ctrl+P; Ctrl+Q |
 
 Crop selection and dragging to pan use the mouse. Deletion still requires
 confirmation, and unavailable actions stay disabled for keyboard use too.

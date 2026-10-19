@@ -17,9 +17,16 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from .library import Library
+from .library import Library, portable_book_name
 from .imaging import black_background_rect
 from .desktop import ICON_PATH, install_desktop
+
+
+def set_button_text(button, text):
+    """Qt resets a button's explicit shortcut when its label changes."""
+    shortcut = button.shortcut()
+    button.setText(text)
+    button.setShortcut(shortcut)
 
 
 class BookForm(QGroupBox):
@@ -140,7 +147,7 @@ class BookForm(QGroupBox):
         self.editing_book = book
         self.folder_overridden = book is not None
         self.setTitle("Edit book" if book else "New book")
-        self.submit_button.setText("Save book" if book else "Create book")
+        set_button_text(self.submit_button, "Save book" if book else "Create book")
         self.title.blockSignals(True)
         self.title.setText(book['title'] if book else '')
         self.title.blockSignals(False)
@@ -447,8 +454,8 @@ class ScanWindow(QMainWindow):
         self.location.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.location.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         footer.addWidget(self.location, 1)
-        self.export_button = self.button("Export books to PDF…", self.export_pdf, footer)
-        self.export_button.setToolTip("Create one PDF per book, containing all its saved pages in order")
+        self.export_button = self.button("Export book to PDF…", self.export_pdf, footer)
+        self.export_button.setToolTip("Choose one book folder and export all its saved pages to a PDF file")
         self.next_button = self.button("Next book", self.choose_book, footer)
         self.done_button = self.button("Done — save and quit", self.close, footer)
         layout.addLayout(footer)
@@ -478,7 +485,7 @@ class ScanWindow(QMainWindow):
 
     def install_shortcuts(self):
         bindings = [
-            (self.capture_button, "F6", "Capture and save / save edits or retry"),
+            (self.capture_button, "Ctrl+S", "Capture and save / save edits or retry"),
             (self.cancel_button, "Escape", "Cancel snapshot or page edits"),
             (self.import_button, "Ctrl+O", "Import image"),
             (self.live_button, "Ctrl+L", "Back to camera"),
@@ -487,7 +494,7 @@ class ScanWindow(QMainWindow):
             (self.remove_book_button, "Ctrl+Shift+Delete", "Delete book"),
             (self.edit_page_button, "Ctrl+E", "Edit selected page"),
             (self.remove_page_button, "Ctrl+Delete", "Delete selected page"),
-            (self.refresh_button, "F5", "Refresh cameras"),
+            (self.refresh_button, "Ctrl+Shift+R", "Refresh cameras"),
             (self.zoom_in_button, "Ctrl+=", "Zoom in"),
             (self.zoom_out_button, "Ctrl+-", "Zoom out"),
             (self.fit_button, "Ctrl+0", "Fit image"),
@@ -496,7 +503,7 @@ class ScanWindow(QMainWindow):
             (self.crop_button, "Ctrl+R", "Start or cancel crop"),
             (self.apply_crop_button, "Ctrl+Return", "Apply crop"),
             (self.reset_button, "Ctrl+Backspace", "Reset edits"),
-            (self.export_button, "Ctrl+P", "Export books to PDF"),
+            (self.export_button, "Ctrl+P", "Export book to PDF"),
             (self.next_button, "Ctrl+Shift+N", "Next book"),
             (self.done_button, "Ctrl+Q", "Save and quit"),
             (self.auto_trim, "Ctrl+T", "Toggle auto-trim"),
@@ -513,11 +520,10 @@ class ScanWindow(QMainWindow):
             self.shortcut_help.append(f"{keys}: {description}")
         self.keyboard_shortcuts = []
         for keys, callback, description in [
-            ("Ctrl+S", self.capture_button.click, "Capture and save / save edits or retry"),
             ("Alt+B", self.books.setFocus, "Focus books; use arrow keys"),
             ("Alt+P", self.pages.setFocus, "Focus pages; use arrow keys"),
             ("Alt+M", self.devices.setFocus, "Focus camera selector"),
-            ("F1", self.show_shortcuts, "Show keyboard shortcuts"),
+            ("Ctrl+H", self.show_shortcuts, "Show keyboard shortcuts"),
         ]:
             shortcut = QShortcut(QKeySequence(keys), self)
             shortcut.setAutoRepeat(False)
@@ -525,7 +531,7 @@ class ScanWindow(QMainWindow):
             self.keyboard_shortcuts.append(shortcut)
             self.shortcut_help.append(f"{keys}: {description}")
         help_menu = self.menuBar().addMenu("&Help")
-        help_menu.addAction("Keyboard shortcuts (F1)", self.show_shortcuts)
+        help_menu.addAction("Keyboard shortcuts (Ctrl+H)", self.show_shortcuts)
 
     def show_shortcuts(self):
         QMessageBox.information(self, "Keyboard shortcuts", "\n".join(self.shortcut_help) +
@@ -731,7 +737,7 @@ class ScanWindow(QMainWindow):
             return
         self.pages.clearSelection()
         self.stack.setCurrentWidget(self.video if self.camera else self.empty)
-        self.status.setText("Position a page, then Capture (F6) to save it immediately." if self.book else "Select a book or click New book to begin.")
+        self.status.setText("Position a page, then Capture (Ctrl+S) to save it immediately." if self.book else "Select a book or click New book to begin.")
         self.update_controls()
 
     def update_controls(self, *_args):
@@ -739,7 +745,7 @@ class ScanWindow(QMainWindow):
         busy = self.capture_id is not None
         ready = self.book is not None and not pending and not busy
         cropping = self.preview.cropping
-        self.capture_button.setText("Save" if pending else "Capture")
+        set_button_text(self.capture_button, "Save" if pending else "Capture")
         self.capture_button.setEnabled(not busy and ((pending and not cropping) or
                                        (ready and self.camera is not None and self.capture.isReadyForCapture())))
         self.cancel_button.setEnabled(pending or busy)
@@ -892,7 +898,7 @@ class ScanWindow(QMainWindow):
 
     def end_crop(self):
         self.crop_button.setChecked(False)
-        self.crop_button.setText("Crop")
+        set_button_text(self.crop_button, "Crop")
         self.preview.set_cropping(False)
 
     def rotate(self, angle=90):
@@ -906,7 +912,7 @@ class ScanWindow(QMainWindow):
             self.end_crop()
             return
         self.preview.set_cropping(enabled)
-        self.crop_button.setText("Cancel crop" if enabled else "Crop")
+        set_button_text(self.crop_button, "Cancel crop" if enabled else "Crop")
         if enabled:
             self.status.setText("Drag around the area to keep, then Apply crop. Use the wheel to zoom; middle-drag to pan. Cancel crop keeps the image unchanged.")
         else:
@@ -968,32 +974,32 @@ class ScanWindow(QMainWindow):
     def export_pdf(self):
         if not self.pending.isNull() or self.capture_id is not None:
             return
-        folder = QFileDialog.getExistingDirectory(self, "Export one PDF per book", str(self.library.root))
+        initial = self.library.image_folder(self.book) if self.book else self.library.root / "books"
+        folder = QFileDialog.getExistingDirectory(self, "Choose book image folder to export", str(initial))
         if not folder:
             return
         try:
-            exports = self.library.pdf_exports(folder)
-            if not exports:
-                self.status.setText("No saved pages to export yet.")
+            book = self.library.book_in_folder(folder)
+            if not book['pages']:
+                raise ValueError("This book has no saved pages to export.")
+            default = Path(folder).parent / f"{portable_book_name(book['title'])}.pdf"
+            filename, _ = QFileDialog.getSaveFileName(
+                self, f"Export {book['title']} — all {len(book['pages'])} pages", str(default),
+                "PDF files (*.pdf)", options=QFileDialog.Option.DontConfirmOverwrite)
+            if not filename:
                 return
-            existing = [path.name for _book, path in exports if path.exists()]
-            if existing:
+            destination = Path(filename)
+            if destination.suffix.lower() != '.pdf':
+                destination = destination.with_name(destination.name + '.pdf')
+            if destination.exists():
                 answer = QMessageBox.question(
-                    self, "Replace exported PDFs?",
-                    f"Replace {len(existing)} existing PDF(s) in this folder?\n\n" + "\n".join(existing),
+                    self, "Replace PDF?", f"Replace {destination}?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
                     QMessageBox.StandardButton.Cancel)
                 if answer != QMessageBox.StandardButton.Yes:
                     return
-            saved, failed = self.library.export_books(folder, overwrite=bool(existing))
-            skipped = len(self.library.books) - len(exports)
-            message = f"Exported {len(saved)} PDF(s) to {folder}. Each PDF contains one book's saved pages in order."
-            if skipped:
-                message += f" Skipped {skipped} empty book(s)."
-            if failed:
-                self.error(message + "\n\nCould not export:\n" + "\n".join(f"{title}: {reason}" for title, reason in failed))
-            else:
-                self.status.setText(message)
+            self.library.export_pdf(book, destination)
+            self.status.setText(f"Exported {book['title']}: all {len(book['pages'])} pages to {destination}.")
         except Exception as exc:
             self.error(exc)
 

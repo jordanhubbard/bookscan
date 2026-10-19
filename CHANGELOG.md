@@ -24,3 +24,8 @@
 - BookScan: Capture now saves immediately after optional trimming; failed saves retain
   the image for retry. Added accelerators for all buttons, keyboard focus navigation,
   shortcut tooltips and F1 help. Saved pages remain editable with explicit Save.
+
+- BookScan: shortcuts no longer require function keys: Ctrl+S captures/saves,
+  Ctrl+Shift+R refreshes cameras, and Ctrl+H opens shortcut help. PDF export now
+  chooses one registered book folder and one destination PDF, including all saved
+  pages in order, with cancellation and overwrite confirmation.

@@ -134,3 +134,28 @@ queue item or let `docs/roadmap/` become a plan archive.
   current and `litai verify` passes all four configured gates; HTML observability
   is not configured. This change uses simulated camera callbacks; a fresh hardware
   capture was not performed. `verification/current.json` records current evidence.
+
+### [x] BOOKSCAN-005 — Portable shortcuts and single-book PDF export
+
+- **Priority:** high
+- **Owner:** components/legacy-project-wrapper
+- **Direction:** Avoid requiring function keys; export one chosen book folder to one chosen PDF file including all pages.
+- **Conclusion:** Use Ctrl+S for capture/save, Ctrl+Shift+R for camera refresh and Ctrl+H for shortcut help. Replace batch UI export with a book-folder chooser and PDF Save As dialog, resolving registered books by their exact image folder and preserving manifest page order.
+- **Depends on:** none
+- **Implementation:**
+  - [x] Replace function-key-only shortcuts and update UI hints/help.
+  - [x] Implement single-book folder selection and PDF output file selection with overwrite protection.
+  - [x] Verify keyboard operation, folder resolution, complete PDF contents and cancellation/failure paths; refresh retained evidence.
+- **Evidence:**
+  - [x] Regression and smoke tests pass including actual PDF page count/order and no export of other books.
+  - [x] CodeGraph, current retained receipt and litai verify pass.
+
+- **Results:** Regression/smoke and disposable retained harness each pass 98
+  tests. Keyboard events verify Ctrl+S capture and page-edit saving, Ctrl+H help,
+  Ctrl+Shift+R refresh, and shortcut preservation across dynamic button labels.
+  PDF fixtures verify exact chosen-book page count/order, selection of a different
+  book than the current sidebar selection, custom folders, extension handling,
+  overwrite approval/cancellation, both chooser cancellations, invalid/empty/shared
+  folders, and safe output alongside images. Source images remain protected.
+  CodeGraph is current; `verification/current.json` records current evidence and
+  `litai verify` passes all four configured gates (HTML is not configured).

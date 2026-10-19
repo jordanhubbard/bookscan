@@ -396,26 +396,44 @@ def test_batch_export_reports_failed_book_and_exports_other_books(library, image
     assert len(list((library.root / 'exports').glob('*.pdf'))) == 1
 
 
-def test_export_button_exports_entire_library(window, image, tmp_path, monkeypatch):
+def test_export_button_chooses_one_book_folder_and_pdf_file(window, image, tmp_path, monkeypatch):
     from PySide6.QtWidgets import QFileDialog
     first = window.library.add_book('First')
     second = window.library.add_book('Second')
     window.library.accept(first, image)
+    image.fill('blue')
     window.library.accept(first, image)
     window.library.accept(second, image)
-    window.book = second
+    window.book = second  # Folder chooser can select a different book.
     window.refresh_books()
     window.update_controls()
-    folder = tmp_path / 'pdfs'
-    folder.mkdir()
+    folder = window.library.image_folder(first)
+    destination = tmp_path / 'chosen-name.pdf'
     monkeypatch.setattr(QFileDialog, 'getExistingDirectory', lambda *args: str(folder))
+    prompts = []
+    def choose_file(*args, **kwargs):
+        prompts.append(args)
+        return str(destination.with_suffix('')), 'PDF files (*.pdf)'
+    monkeypatch.setattr(QFileDialog, 'getSaveFileName', choose_file)
     window.export_button.click()
-    assert len(list(folder.glob('*.pdf'))) == 2
-    assert 'Exported 2 PDF(s)' in window.status.text()
+    assert 'all 2 pages' in prompts[0][1]
+    assert 'first.pdf' in prompts[0][2]
+    assert list(tmp_path.glob('*.pdf')) == [destination]
+    document = QPdfDocument()
+    assert document.load(str(destination)) == QPdfDocument.Error.None_
+    assert document.pageCount() == 2
+    assert document.render(0, QSize(60, 80)).pixelColor(30, 40).red() > 240
+    assert document.render(1, QSize(60, 80)).pixelColor(30, 40).blue() > 240
+    assert document.render(1, QSize(60, 80)).pixelColor(30, 40).red() < 10
+    document.close()
+    assert 'First: all 2 pages' in window.status.text()
+    contents = destination.read_bytes()
     monkeypatch.setattr(QMessageBox, 'question', lambda *args: QMessageBox.StandardButton.Cancel)
-    contents = {p.name: p.read_bytes() for p in folder.glob('*.pdf')}
     window.export_button.click()
-    assert contents == {p.name: p.read_bytes() for p in folder.glob('*.pdf')}
+    assert contents == destination.read_bytes()
+    monkeypatch.setattr(QMessageBox, 'question', lambda *args: QMessageBox.StandardButton.Yes)
+    window.export_button.click()
+    assert destination.read_bytes().startswith(b'%PDF')
 
 
 def test_export_folder_cannot_contain_source_images(library, image):
@@ -1149,7 +1167,7 @@ def test_all_buttons_have_unique_accelerators_and_disabled_capture_is_safe(windo
     assert not calls  # No selected book / ready camera.
 
 
-@pytest.mark.parametrize('key,control', [('F6', False), ('S', True)])
+@pytest.mark.parametrize('key,control', [('S', True)])
 def test_keyboard_capture_saves_without_second_press(window, image, tmp_path, monkeypatch, key, control):
     from types import SimpleNamespace
     from PySide6.QtCore import Qt
@@ -1173,3 +1191,98 @@ def test_keyboard_capture_saves_without_second_press(window, image, tmp_path, mo
     assert len(window.book['pages']) == 1
     assert window.pending.isNull()
     assert window.capture_id is None
+
+
+@pytest.mark.parametrize('cancel_at', ['folder', 'file'])
+def test_single_export_cancellation(window, image, tmp_path, monkeypatch, cancel_at):
+    from PySide6.QtWidgets import QFileDialog
+    book = window.library.add_book('Cancel export')
+    window.library.accept(book, image)
+    monkeypatch.setattr(QFileDialog, 'getExistingDirectory', lambda *args:
+                        '' if cancel_at == 'folder' else str(window.library.image_folder(book)))
+    calls = []
+    def choose_file(*args, **kwargs):
+        calls.append(True)
+        return '', ''
+    monkeypatch.setattr(QFileDialog, 'getSaveFileName', choose_file)
+    window.export_pdf()
+    assert bool(calls) == (cancel_at == 'file')
+    assert not list(tmp_path.rglob('*.pdf'))
+
+
+def test_export_book_folder_resolution(library, tmp_path):
+    custom = tmp_path / 'external-book'
+    book = library.add_book('Custom', image_folder=custom)
+    assert library.book_in_folder(custom / '.') is book
+    with pytest.raises(ValueError, match='associated'):
+        library.book_in_folder(library.root / 'books')
+    library.add_book('Shared', image_folder=custom)
+    with pytest.raises(ValueError, match='Multiple'):
+        library.book_in_folder(custom)
+
+
+def test_single_pdf_can_be_saved_in_book_folder_without_overwriting_pages(library, image):
+    book = library.add_book('Book')
+    page = library.accept(book, image)
+    output = library.image_folder(book) / 'book.pdf'
+    library.export_pdf(book, output)
+    assert output.read_bytes().startswith(b'%PDF')
+    with pytest.raises(ValueError, match='different'):
+        library.export_pdf(book, library.page_path(page))
+    assert QImage(str(library.page_path(page))) == image
+
+
+def test_all_shortcuts_work_without_function_keys(window, monkeypatch):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QPushButton
+    assert all(not button.shortcut().toString().startswith('F') for button in window.findChildren(QPushButton))
+    assert all(not shortcut.key().toString().startswith('F') for shortcut in window.keyboard_shortcuts)
+    calls = []
+    monkeypatch.setattr(QMessageBox, 'information', lambda *args: calls.append('help'))
+    window.show()
+    window.activateWindow()
+    QApplication.processEvents()
+    QTest.keyClick(window, Qt.Key.Key_H, Qt.KeyboardModifier.ControlModifier)
+    QTest.qWait(180)
+    assert calls == ['help']
+    refreshes = []
+    window.refresh_button.clicked.disconnect()
+    window.refresh_button.clicked.connect(lambda: refreshes.append(True))
+    QTest.keyClick(window, Qt.Key.Key_R, Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+    QTest.qWait(180)
+    assert refreshes == [True]
+
+
+@pytest.mark.parametrize('kind', ['unknown', 'empty', 'shared'])
+def test_export_rejects_invalid_book_folder_before_save_dialog(window, tmp_path, monkeypatch, kind):
+    from PySide6.QtWidgets import QFileDialog
+    folder = tmp_path / 'chosen'
+    folder.mkdir()
+    if kind != 'unknown':
+        window.library.add_book('Empty', image_folder=folder)
+    if kind == 'shared':
+        window.library.add_book('Shared', image_folder=folder)
+    monkeypatch.setattr(QFileDialog, 'getExistingDirectory', lambda *args: str(folder))
+    monkeypatch.setattr(QFileDialog, 'getSaveFileName', lambda *args, **kwargs: pytest.fail('Invalid folder must not prompt for output'))
+    errors = []
+    monkeypatch.setattr(window, 'error', errors.append)
+    window.export_pdf()
+    assert len(errors) == 1
+    assert not list(tmp_path.rglob('*.pdf'))
+
+
+def test_dynamic_button_labels_preserve_shortcuts(window, image):
+    window.book = window.library.add_book('Shortcuts')
+    window.present(image)
+    assert window.capture_button.shortcut().toString() == 'Ctrl+S'
+    window.crop_button.click()
+    assert window.crop_button.shortcut().toString() == 'Ctrl+R'
+    window.crop_button.click()
+    assert window.crop_button.shortcut().toString() == 'Ctrl+R'
+    window.cancel_snapshot()
+    assert window.capture_button.shortcut().toString() == 'Ctrl+S'
+    window.book_form.populate(window.book)
+    assert window.book_form.submit_button.shortcut().toString() == 'Alt+Return'
+    window.book_form.populate()
+    assert window.book_form.submit_button.shortcut().toString() == 'Alt+Return'

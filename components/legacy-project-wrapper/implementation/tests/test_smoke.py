@@ -58,20 +58,19 @@ def test_desktop_session_smoke(smoke_app, tmp_path, monkeypatch):
         assert window.book['folder_name'] == 'second-smoke-book'
         window.import_button.click()
         window.capture_button.click()
-        output = tmp_path / 'pdfs'
-        output.mkdir()
-        monkeypatch.setattr(QFileDialog, 'getExistingDirectory', lambda *args: str(output))
+        output = tmp_path / 'first-book.pdf'
+        monkeypatch.setattr(QFileDialog, 'getExistingDirectory', lambda *args: str(library.image_folder(first)))
+        monkeypatch.setattr(QFileDialog, 'getSaveFileName', lambda *args, **kwargs: (str(output), 'PDF files (*.pdf)'))
         window.export_button.click()
-        assert 'Exported 2 PDF(s)' in window.status.text()
+        assert 'all 2 pages' in window.status.text()
         reopened = Library(library.root)
         assert [len(book['pages']) for book in reopened.books] == [2, 1]
-        for book, pdf in reopened.pdf_exports(output):
-            document = QPdfDocument()
-            assert document.load(str(pdf)) == QPdfDocument.Error.None_
-            assert document.pageCount() == len(book['pages'])
-            if book['title'] == first['title']:
-                assert document.pagePointSize(0).width() > document.pagePointSize(0).height()
-            document.close()
+        document = QPdfDocument()
+        assert document.load(str(output)) == QPdfDocument.Error.None_
+        assert document.pageCount() == 2
+        assert document.pagePointSize(0).width() > document.pagePointSize(0).height()
+        document.close()
+        assert list(tmp_path.glob('*.pdf')) == [output]
         assert len(list((tmp_path / 'scans').glob('*.png'))) == 2
         window.done_button.click()
         assert not window.isVisible()

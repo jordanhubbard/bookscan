@@ -219,6 +219,16 @@ class Library:
             raise
         return relative
 
+    def book_in_folder(self, folder):
+        """Resolve one registered book by its exact image folder, never its parent."""
+        folder = Path(folder).expanduser().resolve()
+        matches = [book for book in self.books if self.image_folder(book).resolve() == folder]
+        if not matches:
+            raise ValueError("Choose an image folder associated with a book in this library.")
+        if len(matches) != 1:
+            raise ValueError("Multiple books use this folder. Give each book its own image folder before exporting.")
+        return matches[0]
+
     def pdf_exports(self, folder):
         """Plan distinct, stable filenames for every nonempty book."""
         folder = Path(folder).expanduser().resolve()
@@ -262,8 +272,8 @@ class Library:
             raise ValueError("Save at least one page before exporting")
         destination = Path(destination).resolve()
         source_images = {self.page_path(page) for item in self.books for page in item["pages"]}
-        if destination == self.path or destination in source_images or destination.is_relative_to(self.root / "books"):
-            raise ValueError("Choose an export location outside the stored page images")
+        if destination == self.path or destination in source_images:
+            raise ValueError("Choose a PDF filename different from the library metadata and page images")
         # Write to a sibling temp file; failed exports never replace an existing PDF.
         temporary = destination.with_name(f".{destination.name}.{uuid4().hex}.tmp")
         painter = QPainter()
