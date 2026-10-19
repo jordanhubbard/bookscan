@@ -52,7 +52,10 @@ def test_desktop_session_smoke(smoke_app, tmp_path, monkeypatch):
         assert len(first['pages']) == 2
         window.new_book_button.click()
         window.book_form.title.setText('Second smoke book')
+        assert window.book_form.destination.name == 'second-smoke-book'
+        assert not window.book_form.destination.exists()
         window.book_form.submit_button.click()
+        assert window.book['folder_name'] == 'second-smoke-book'
         window.import_button.click()
         window.capture_button.click()
         output = tmp_path / 'pdfs'

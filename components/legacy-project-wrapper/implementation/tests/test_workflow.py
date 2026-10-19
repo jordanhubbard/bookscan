@@ -861,3 +861,135 @@ def test_failed_trash_operation_reports_retained_images(window, image, monkeypat
     assert path.exists()
     assert 'could not be deleted' in window.status.text()
     assert str(path) in window.status.text()
+
+
+@pytest.mark.parametrize('title,expected', [
+    ('My Book: Volume 1', 'my-book-volume-1'),
+    ('  A   Book__Title... ', 'a-book-title'),
+    ('../Unsafe/Title\\with:*?"<>|chars', 'unsafe-title-with-chars'),
+    ('CON', 'book-con'), ('prn', 'book-prn'), ('AUX', 'book-aux'),
+    ('NUL', 'book-nul'), ('COM1', 'book-com1'), ('LPT9', 'book-lpt9'),
+    ('COM¹', 'book-com1'), ('LPT²', 'book-lpt2'),
+    ('NUL.txt', 'nul-txt'), ('...', 'book'),
+    ('Café déjà vu', 'cafe-deja-vu'), ('東京 📚', 'book'),
+    ('a\x00b\nc\td', 'a-b-c-d'), ('-Leading', 'leading'),
+    ('X' * 200, 'x' * 64),
+])
+def test_portable_book_folder_names(title, expected):
+    from bookscan.library import portable_book_name
+    import re
+    name = portable_book_name(title)
+    assert name == expected
+    assert re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', name)
+    assert len(name) <= 64
+    assert '/' not in name and '\\' not in name and '.' not in name
+
+
+def test_named_default_folder_is_relative_and_survives_library_move(library, image, tmp_path):
+    import shutil
+    book = library.add_book('Travel Photos: 2026')
+    assert library.image_folder(book) == library.root / 'books' / 'travel-photos-2026'
+    assert 'image_folder' not in book
+    reference = library.accept(book, image)
+    assert reference.startswith('books/travel-photos-2026/')
+    moved = tmp_path / 'relocated-library'
+    shutil.copytree(library.root, moved)
+    reopened = Library(moved)
+    assert reopened.image_folder(reopened.books[0]) == moved / 'books' / 'travel-photos-2026'
+    assert QImage(str(reopened.page_path(reference))) == image
+
+
+def test_default_folder_collisions_are_case_insensitive_and_do_not_merge(library, image):
+    parent = library.root / 'books'
+    parent.mkdir()
+    (parent / 'MY-BOOK').mkdir()
+    first = library.add_book('My Book')
+    second = library.add_book('My:Book')
+    assert first['folder_name'] == 'my-book-2'
+    assert second['folder_name'] == 'my-book-3'
+    library.accept(first, image)
+    assert not list((parent / 'MY-BOOK').iterdir())
+    assert not list(library.image_folder(second).iterdir())
+    # A missing folder still belongs to its book and cannot be silently reused.
+    library.image_folder(second).rmdir()
+    assert library.new_book_folder('My Book').name == 'my-book-4'
+
+
+def test_live_default_preview_browse_override_and_restore(window, tmp_path):
+    window.new_book_button.click()
+    form = window.book_form
+    form.title.setText('My Book: Volume 1')
+    expected = window.library.root / 'books' / 'my-book-volume-1'
+    assert form.destination == expected
+    assert form.folder.text() == str(expected)
+    assert str(expected) in form.folder_preview.text()
+    assert not form.folder_overridden
+    assert not expected.exists()  # Typing must have no filesystem side effects.
+    custom = tmp_path / 'User selected folder'
+    custom.mkdir()
+    form.browse_folder_button.click()
+    form.folder_picker.setDirectory(str(custom))
+    form.folder_picker.accept()
+    assert form.folder_overridden
+    form.title.setText('Changed Book')
+    assert form.destination == custom
+    assert form.folder.text() == str(custom)
+    form.default_folder_button.click()
+    expected = window.library.root / 'books' / 'changed-book'
+    assert form.destination == expected
+    assert not form.folder_overridden
+    form.submit_button.click()
+    assert window.library.image_folder(window.book) == expected
+    assert expected.is_dir()
+
+
+def test_manual_folder_override_is_exact_and_previewed(window, tmp_path):
+    window.choose_book()
+    form = window.book_form
+    form.title.setText('A Book')
+    chosen = tmp_path / 'Chosen folder'
+    form.folder.setText(str(chosen))
+    form.title.setText('Another title')
+    assert form.destination == chosen
+    assert str(chosen) in form.folder_preview.text()
+    form.submit_button.click()
+    assert window.book['image_folder'] == str(chosen)
+    assert chosen.is_dir()
+    assert not (chosen / 'another-title').exists()
+
+
+def test_default_folder_race_refreshes_preview_before_retry(window):
+    window.choose_book()
+    form = window.book_form
+    form.title.setText('Collision')
+    initial = form.destination
+    initial.mkdir(parents=True)
+    form.submit_button.click()
+    assert not window.library.books
+    assert form.destination == initial.with_name('collision-2')
+    assert 'updated destination' in form.error_label.text()
+    assert not form.destination.exists()
+    form.submit_button.click()
+    assert window.book['folder_name'] == 'collision-2'
+
+
+def test_existing_id_based_book_keeps_original_folder(library, image):
+    book = {'id': 'a' * 32, 'title': 'Old book', 'kind': 'Other', 'author': '', 'pages': []}
+    library.books.append(book)
+    library.save()
+    reference = library.accept(book, image)
+    assert reference.startswith('books/' + 'a' * 32 + '/')
+    reopened = Library(library.root)
+    assert reopened.image_folder(reopened.books[0]) == library.root / 'books' / ('a' * 32)
+    library.update_book(book, 'New title', 'Notebook', '')
+    assert library.image_folder(book).name == 'a' * 32
+
+
+def test_new_named_folder_failure_rolls_back_reservation(library, monkeypatch):
+    def fail():
+        raise OSError('disk full')
+    monkeypatch.setattr(library, 'save', fail)
+    with pytest.raises(OSError, match='disk full'):
+        library.add_book('Do not reserve forever')
+    assert not library.books
+    assert not (library.root / 'books' / 'do-not-reserve-forever').exists()

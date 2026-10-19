@@ -29,10 +29,15 @@ To choose a different library folder:
    an empty library and never blocks the rest of the window. Enter a title,
    optionally specify author and type, then click **Create book**. Types include hardcover, paperback, textbook,
    notebook, magazine, and other. Each snapshot is one PDF page: a photographed
-   two-page spread remains one image. For a new book, optionally set **Images
-   folder** with **Browse…** (or type a folder path). Every image saved for that
-   book goes directly into this folder. Leave it blank to use the default library
-   storage. The app remembers the folder when you resume the book.
+   two-page spread remains one image. As you type a new book title, **Images folder**
+   and the destination preview update to a safe title-based subfolder in the library.
+   For example, `My Book: Volume 1` becomes `books/my-book-volume-1/`. Spaces and
+   punctuation become hyphens, accents are simplified, names use lowercase ASCII,
+   and Windows device names receive a safe prefix. Names are limited to 64 characters;
+   case-insensitive collisions receive `-2`, `-3`, and so on. Typing creates no folders.
+   **Browse…** (or a manually entered path) overrides the exact destination; changing
+   the title then leaves your choice alone. **Use default** restores the automatic
+   destination. The app remembers the actual folder when you resume the book.
 2. Select your camera and position the page in the live view. Click **Capture**, or use **Import image** to load an existing photograph.
 3. The **Capture** button becomes **Save** when the snapshot is ready. Review it,
    then click that same button again to save it to the book. **Cancel**, immediately
@@ -68,11 +73,15 @@ To choose a different library folder:
 
 The default library is `Documents/BookScan` (using Qt's platform Documents
 location). `library.json` holds book metadata and ordered page references;
-`books/<id>/` holds saved PNG images for books using default storage. Books with
+`books/<safe-title>/` holds saved PNG images for new books using default storage.
+Existing books keep their prior folders, including older `books/<id>/` paths; editing
+or renaming a book never relocates its images. Books with
 an **Images folder** store PNGs there instead, with numbered unique filenames;
 the library stores their folder and image references. Back up both the library
 folder and any separately chosen image folders. Keep those folders at the same
-paths when reopening the library. If a folder is unavailable, reconnect it and
+paths when reopening a library with external image folders. Default title folders
+and their page references remain relative to the library, so moving the entire
+library together preserves them. If a folder is unavailable, reconnect it and
 retry Save; the unsaved preview is retained. The footer shows the current book's
 image folder.
 Titles are metadata, so duplicate names and filesystem punctuation are safe.
@@ -164,3 +173,8 @@ is installed and selected as this project's source-intelligence provider.
 <!-- literate-ai:parent-repositories -->
 - Parent repository: [github.com/jordanhubbard/literate-ai](<https://github.com/jordanhubbard/literate-ai>)
 <!-- /literate-ai:parent-repositories -->
+
+Generated folder components follow the conservative subset of Microsoft's
+[Naming Files, Paths, and Namespaces](https://learn.microsoft.com/en-us/windows/win32/fileio/naming-a-file)
+rules described above. A Browse override preserves the selected existing folder
+exactly; the application does not rename its parent directories.

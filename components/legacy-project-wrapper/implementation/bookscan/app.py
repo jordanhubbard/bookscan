@@ -25,8 +25,12 @@ class BookForm(QGroupBox):
     submitted = Signal()
     cancelled = Signal()
 
-    def __init__(self, parent=None):
+    def __init__(self, library, parent=None):
         super().__init__("New book", parent)
+        self.library = library
+        self.folder_overridden = False
+        self._setting_folder = False
+        self.destination = None
         self.editing_book = None
         self.busy = False
         self.folder_picker = None
@@ -38,12 +42,15 @@ class BookForm(QGroupBox):
         self.kind = QComboBox()
         self.kind.addItems(["Hardcover", "Paperback", "Textbook", "Notebook", "Magazine", "Other"])
         self.folder = QLineEdit()
-        self.folder.setPlaceholderText("Default library folder (optional)")
+        self.folder.setPlaceholderText("Automatic folder from book title")
         self.browse_folder_button = QPushButton("&Browse…")
         self.browse_folder_button.clicked.connect(self.browse_folder)
         folder_row = QHBoxLayout()
         folder_row.addWidget(self.folder, 1)
         folder_row.addWidget(self.browse_folder_button)
+        self.default_folder_button = QPushButton("Use default")
+        self.default_folder_button.clicked.connect(self.use_default_folder)
+        folder_row.addWidget(self.default_folder_button)
         form = QFormLayout()
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
         form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows)
@@ -61,6 +68,11 @@ class BookForm(QGroupBox):
         folder_label.setBuddy(self.folder)
         form.addRow(folder_label, folder_row)
         layout.addLayout(form)
+        self.folder_preview = QLabel()
+        self.folder_preview.setWordWrap(True)
+        self.folder_preview.setTextFormat(Qt.TextFormat.PlainText)
+        self.folder_preview.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(self.folder_preview)
         self.error_label = QLabel()
         self.error_label.setWordWrap(True)
         self.error_label.setTextFormat(Qt.TextFormat.PlainText)
@@ -77,11 +89,46 @@ class BookForm(QGroupBox):
         actions.addWidget(self.submit_button)
         layout.addLayout(actions)
         self.title.textChanged.connect(self.update_state)
+        self.folder.textChanged.connect(self.folder_changed)
         self.title.returnPressed.connect(lambda: self.submitted.emit() if self.submit_button.isEnabled() else None)
         self.update_state()
 
+    def set_folder_text(self, text):
+        self._setting_folder = True
+        try:
+            self.folder.setText(text)
+            self.folder.setCursorPosition(len(text))
+        finally:
+            self._setting_folder = False
+
+    def folder_changed(self):
+        if self._setting_folder:
+            return
+        self.folder_overridden = bool(self.folder.text().strip())
+        self.update_state()
+
+    def use_default_folder(self):
+        self.folder_overridden = False
+        self.update_state()
+
     def update_state(self):
-        self.submit_button.setEnabled(bool(self.title.text().strip()) and not self.busy)
+        valid = True
+        try:
+            if self.editing_book is not None:
+                self.destination = self.library.image_folder(self.editing_book)
+            elif self.folder_overridden:
+                self.destination = Path(self.folder.text().strip()).expanduser().resolve()
+            else:
+                self.destination = self.library.new_book_folder(self.title.text())
+                self.set_folder_text(str(self.destination))
+            self.folder_preview.setText(f"Images will be saved to: {self.destination}")
+            self.folder.setToolTip(str(self.destination))
+        except (OSError, ValueError) as exc:
+            valid = False
+            self.destination = None
+            self.folder_preview.setText(f"Choose another images folder: {exc}")
+        self.default_folder_button.setEnabled(self.editing_book is None and self.folder_overridden)
+        self.submit_button.setEnabled(bool(self.title.text().strip()) and not self.busy and valid)
 
     def set_busy(self, busy):
         self.busy = busy
@@ -90,16 +137,20 @@ class BookForm(QGroupBox):
 
     def populate(self, book=None):
         self.editing_book = book
+        self.folder_overridden = book is not None
         self.setTitle("Edit book" if book else "New book")
         self.submit_button.setText("Save book" if book else "Create book")
+        self.title.blockSignals(True)
         self.title.setText(book['title'] if book else '')
+        self.title.blockSignals(False)
         self.author.setText(book.get('author', '') if book else '')
         self.kind.setCurrentText(book.get('kind', 'Other') if book else 'Hardcover')
-        self.folder.setText(book.get('image_folder', '') if book else '')
+        if book:
+            self.set_folder_text(str(self.library.image_folder(book)))
         self.folder.setReadOnly(book is not None)
-        self.folder.setToolTip("Image folders are chosen when creating a book" if book else '')
         self.browse_folder_button.setEnabled(book is None)
         self.error_label.hide()
+        self.update_state()
 
     def show_error(self, message):
         self.error_label.setText(str(message))
@@ -114,8 +165,10 @@ class BookForm(QGroupBox):
             picker.setWindowModality(Qt.WindowModality.NonModal)
             picker.accepted.connect(lambda: self.folder.setText(picker.selectedFiles()[0]) if picker.selectedFiles() else None)
             self.folder_picker = picker
-        if self.folder.text():
-            self.folder_picker.setDirectory(self.folder.text())
+        start = self.destination or self.library.root
+        while not start.is_dir() and start != start.parent:
+            start = start.parent
+        self.folder_picker.setDirectory(str(start))
         self.folder_picker.show()
         self.folder_picker.raise_()
 
@@ -329,7 +382,7 @@ class ScanWindow(QMainWindow):
         workspace = QWidget()
         right = QVBoxLayout(workspace)
         right.setSpacing(10)
-        self.book_form = BookForm(self)
+        self.book_form = BookForm(library, self)
         self.book_form.submitted.connect(self.submit_book)
         self.book_form.cancelled.connect(self.cancel_book_form)
         self.book_form.hide()
@@ -473,6 +526,7 @@ class ScanWindow(QMainWindow):
     def choose_book(self):
         if self.book_form.editing_book is not None:
             self.book_form.populate()
+        self.book_form.update_state()
         self.book_form.show()
         self.book_form.title.setFocus()
         self.update_controls()
@@ -490,8 +544,11 @@ class ScanWindow(QMainWindow):
                 self.library.update_book(form.editing_book, form.title.text(), form.kind.currentText(), form.author.text())
                 self.book = form.editing_book
             else:
-                self.book = self.library.add_book(form.title.text(), form.kind.currentText(), form.author.text(), form.folder.text().strip())
+                self.book = self.library.add_book(form.title.text(), form.kind.currentText(), form.author.text(),
+                                                  form.folder.text().strip() if form.folder_overridden else None,
+                                                  expected_folder=form.destination if not form.folder_overridden else None)
         except Exception as exc:
+            form.update_state()
             form.show_error(exc)
             return
         self.cancel_book_form()

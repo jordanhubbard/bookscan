@@ -4,7 +4,8 @@
 
 Provide a Qt desktop workflow for scanning and organizing books: capture/review/save,
 optional black-background trimming, image editing, book folders, page and book
-management, and one complete PDF per book. Preserve user scans across sessions.
+management, and one complete PDF per book. New books use portable title-based
+image subfolders with a live destination preview and exact Browse override. Preserve user scans across sessions.
 
 ## Dependencies
 
@@ -16,12 +17,12 @@ dependency for source navigation, not a prerequisite for running the desktop app
 
 The existing Python application implements the scanning workflow, inline book forms,
 rotation/cropping/zoom, folders, deletion confirmations and PDF export. Its regression and smoke
-suite contains 54 checks. Literate AI adoption is complete at the retained-source stage, with a current
-54-test receipt and four passing verification gates; hardware coverage is limited to the previously tested NETUM USB camera.
+suite contains 79 checks. Literate AI adoption is complete at the retained-source stage, with a current
+current retained evidence and four verification gates; hardware coverage is limited to the previously tested NETUM USB camera.
 
 ## Current work
 
-See [active work](docs/roadmap/active-work.md). BOOKSCAN-001 is complete. Native
+See [active work](docs/roadmap/active-work.md). BOOKSCAN-001 is complete; BOOKSCAN-002 is complete with portable title folders, live preview, and exact Browse overrides. Native
 regeneration remains a separate, deferred program; existing source is authoritative.
 
 ## Completed work

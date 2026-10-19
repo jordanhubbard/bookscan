@@ -63,3 +63,26 @@ queue item or let `docs/roadmap/` become a plan archive.
   developer commands and the installed desktop CLI still resolve after adoption.
 - **Tracker:** Local Git repository; no forge remote is configured, so hosted issue
   and review reconciliation is unavailable. No remote publication was requested.
+
+### [x] BOOKSCAN-002 — Portable title-based book folders with live path preview
+
+- **Priority:** high
+- **Owner:** components/legacy-project-wrapper
+- **Direction:** Use the book title as a safe Windows/Unix-compatible image subfolder and show the default destination while typing.
+- **Conclusion:** New books use an ASCII-normalized, collision-safe title subfolder beneath default storage. Browse or manual path entry overrides the exact destination and remains fixed through title changes; Use default restores automatic naming. Preserve all existing book paths and preview the destination before creation.
+- **Depends on:** none
+- **Implementation:**
+  - [x] Implement portable title normalization and deterministic collision handling.
+  - [x] Preview the exact image destination live in the inline form and update folder labels.
+  - [x] Update regression and smoke coverage, retained-source evidence and documentation.
+- **Evidence:**
+  - [x] Normalization, path preview, collision, existing-library compatibility and full smoke/regression checks pass.
+  - [x] Current retained harness receipt, CodeGraph index and litai verify pass.
+
+- **Results:** The regression/smoke suite and current retained harness pass 79
+  checks, including safe ASCII names, Windows reserved devices, case-insensitive
+  collisions, default path previews, exact Browse/manual overrides, reservation
+  races, rollback, and existing-library compatibility. The rendered inline form
+  was inspected at 1180×800. `verification/current.json` is current; `litai verify`
+  passes authority, locks, source intelligence, and receipt gates. Native Windows
+  execution was not performed; portable-name rules have explicit fixtures.

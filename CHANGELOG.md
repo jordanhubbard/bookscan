@@ -11,3 +11,8 @@
   implementation and user content, with a current retained-harness receipt.
 - Added CodeGraph 1.6.2 developer provisioning and source-intelligence integration.
 - Kept root `make deps`, `make run`, `make check`, and `make smoke` entry points.
+
+- BookScan: new default image folders use portable, collision-safe book titles
+  instead of opaque IDs. The destination updates while typing; Browse and manual
+  paths override it exactly, and Use default restores automatic naming. Existing
+  books keep their image locations.
