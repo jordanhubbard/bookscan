@@ -25,3 +25,6 @@ dist/
 .testmondata
 .testmondata-journal
 .testmondata.identity.json
+
+# Operator-local lifecycle process locks.
+.litai-locks/
