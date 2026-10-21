@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- BookScan: confirming a new book title now moves its image directory to the
+  previewed title-based name and updates saved page paths. Existing destinations
+  are preserved; failed moves or saves keep the original book and scans.
+
+- BookScan: reorder saved pages by dragging in the sidebar or using Move up/down
+  (Ctrl+Shift+Up/Down). Image filenames and PDF order follow the new page order;
+  failed saves preserve the original order and scans.
+
 - Initialized the project with Literate AI's specification-led lifecycle and durable
   user-directed work queue.
 
