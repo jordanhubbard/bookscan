@@ -64,6 +64,10 @@ To choose a different library folder:
    it does not straighten perspective or curved pages.
 7. Turn the page and repeat. Saved pages appear in order in the sidebar; click
    one to review it and use **Back to camera** to return to scanning.
+   Drag pages within the sidebar to reorder them, or select a page and use
+   **Move up** / **Move down** (Ctrl+Shift+Up / Ctrl+Shift+Down). Changes save
+   immediately; image filenames are renumbered to match, and PDF exports use
+   the new order. Reordering is disabled during capture and unsaved edits.
 8. **Next book** opens the inline form for another book. You can also select an
    existing book in the sidebar. **Done — save and quit** saves the
    library and exits. If a snapshot is awaiting review, choose whether to save,
@@ -82,8 +86,9 @@ To choose a different library folder:
 The default library is `Documents/BookScan` (using Qt's platform Documents
 location). `library.json` holds book metadata and ordered page references;
 `books/<safe-title>/` holds saved PNG images for new books using default storage.
-Existing books keep their prior folders, including older `books/<id>/` paths; editing
-or renaming a book never relocates its images. Books with
+Existing books keep their prior folders, including older `books/<id>/` paths,
+until their title changes. Confirming a new title moves the image directory to a
+portable title-based sibling and updates all saved page paths. Books with
 an **Images folder** store PNGs there instead, with numbered unique filenames;
 the library stores their folder and image references. Back up both the library
 folder and any separately chosen image folders. Keep those folders at the same
@@ -113,8 +118,15 @@ metadata; they do not apply different image processing.
 ## Manage books and pages
 
 - Select a book and click **Edit** to change its title, author, or type in the
-  inline form. Its image folder remains the one selected when the book was
-  created. Click **Save book** to apply changes, or **Cancel** to discard them.
+  inline form. Changing the title previews a new, portable image directory name
+  in the same parent folder, including for custom image folders. Click **Save book**
+  to move the whole directory and save the updated title and page paths, or
+  **Cancel** to leave everything unchanged. Existing destinations are preserved;
+  collisions receive a numbered suffix. Author/type edits leave the directory alone.
+  Failed copies or saves preserve the original folder and book details for retry.
+  Shared image folders and the library root must first be separated into dedicated
+  book folders before they can be renamed. If old-folder cleanup fails after a
+  successful save, a status message identifies the remaining old files.
 - Select a saved page and click **Edit page** to rotate or crop it. **Save**
   atomically updates that page's image in place, preserving its position and page
   count. **Cancel** leaves the saved image unchanged. Exported PDFs use the edited

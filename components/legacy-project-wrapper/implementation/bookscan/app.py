@@ -11,7 +11,7 @@ from PySide6.QtGui import QImage, QImageReader, QPixmap, QTransform, QIcon, QPai
 from PySide6.QtMultimedia import QCamera, QImageCapture, QMediaCaptureSession, QMediaDevices
 from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QGroupBox, QStyle, QSizePolicy, QFileDialog, QFormLayout,
+    QApplication, QAbstractItemView, QCheckBox, QComboBox, QGroupBox, QStyle, QSizePolicy, QFileDialog, QFormLayout,
     QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMainWindow,
     QMessageBox, QPushButton, QSplitter, QStackedWidget,
     QVBoxLayout, QWidget,
@@ -27,6 +27,22 @@ def set_button_text(button, text):
     shortcut = button.shortcut()
     button.setText(text)
     button.setShortcut(shortcut)
+
+
+class PageList(QListWidget):
+    reordered = Signal()
+
+    def dropEvent(self, event):
+        if event.source() is not self or not self.isEnabled():
+            event.ignore()
+            return
+        previous = self.blockSignals(True)
+        try:
+            super().dropEvent(event)
+        finally:
+            self.blockSignals(previous)
+        if event.isAccepted():
+            self.reordered.emit()
 
 
 class BookForm(QGroupBox):
@@ -123,13 +139,16 @@ class BookForm(QGroupBox):
         valid = True
         try:
             if self.editing_book is not None:
-                self.destination = self.library.image_folder(self.editing_book)
+                self.destination = self.library.renamed_book_folder(self.editing_book, self.title.text())
+                self.set_folder_text(str(self.destination))
             elif self.folder_overridden:
                 self.destination = Path(self.folder.text().strip()).expanduser().resolve()
             else:
                 self.destination = self.library.new_book_folder(self.title.text())
                 self.set_folder_text(str(self.destination))
-            self.folder_preview.setText(f"Images will be saved to: {self.destination}")
+            moving = self.editing_book is not None and self.destination != self.library.image_folder(self.editing_book)
+            self.folder_preview.setText(("Save book will move the image folder to: " if moving else
+                                        "Images will be saved to: ") + str(self.destination))
             self.folder.setToolTip(str(self.destination))
         except (OSError, ValueError) as exc:
             valid = False
@@ -379,14 +398,22 @@ class ScanWindow(QMainWindow):
         self.books.currentRowChanged.connect(self.select_book)
         left.addWidget(self.books)
         left.addWidget(QLabel("Saved pages"))
-        self.pages = QListWidget()
+        self.pages = PageList()
         self.pages.setAccessibleName("Saved pages")
+        self.pages.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.pages.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.pages.setToolTip("Drag saved pages to reorder them, or use Move up / Move down. Image filenames follow page order.")
+        self.pages.reordered.connect(self.pages_dropped)
         self.pages.currentRowChanged.connect(self.review_page)
         left.addWidget(self.pages, 2)
         page_actions = QHBoxLayout()
         self.edit_page_button = self.button("Edit page", self.edit_selected_page, page_actions)
         self.remove_page_button = self.button("Delete page", self.request_remove_page, page_actions)
         left.addLayout(page_actions)
+        move_actions = QHBoxLayout()
+        self.move_up_button = self.button("Move up", lambda: self.move_page(-1), move_actions)
+        self.move_down_button = self.button("Move down", lambda: self.move_page(1), move_actions)
+        left.addLayout(move_actions)
         splitter.addWidget(sidebar)
         workspace = QWidget()
         right = QVBoxLayout(workspace)
@@ -494,6 +521,8 @@ class ScanWindow(QMainWindow):
             (self.remove_book_button, "Ctrl+Shift+Delete", "Delete book"),
             (self.edit_page_button, "Ctrl+E", "Edit selected page"),
             (self.remove_page_button, "Ctrl+Delete", "Delete selected page"),
+            (self.move_up_button, "Ctrl+Shift+Up", "Move selected page up"),
+            (self.move_down_button, "Ctrl+Shift+Down", "Move selected page down"),
             (self.refresh_button, "Ctrl+Shift+R", "Refresh cameras"),
             (self.zoom_in_button, "Ctrl+=", "Zoom in"),
             (self.zoom_out_button, "Ctrl+-", "Zoom out"),
@@ -574,7 +603,9 @@ class ScanWindow(QMainWindow):
                     if reader.size().isValid():
                         reader.setScaledSize(reader.size().scaled(QSize(80, 100), Qt.AspectRatioMode.KeepAspectRatio))
                     self.thumbnails[path] = QIcon(QPixmap.fromImage(reader.read()))
-                self.pages.addItem(QListWidgetItem(self.thumbnails[path], f"Page {number}"))
+                item = QListWidgetItem(self.thumbnails[path], f"Page {number}")
+                item.setData(Qt.ItemDataRole.UserRole, number - 1)
+                self.pages.addItem(item)
         else:
             self.heading.setText("Select a book or create a new one")
             self.location.setText(f"Library: {self.library.root}")
@@ -603,9 +634,12 @@ class ScanWindow(QMainWindow):
         form = self.book_form
         if not form.submit_button.isEnabled():
             return
+        notice = None
+        editing = form.editing_book is not None
         try:
             if form.editing_book is not None:
-                self.library.update_book(form.editing_book, form.title.text(), form.kind.currentText(), form.author.text())
+                notice = self.library.update_book(form.editing_book, form.title.text(), form.kind.currentText(),
+                                                  form.author.text(), expected_folder=form.destination)
                 self.book = form.editing_book
             else:
                 self.book = self.library.add_book(form.title.text(), form.kind.currentText(), form.author.text(),
@@ -616,14 +650,50 @@ class ScanWindow(QMainWindow):
             form.show_error(exc)
             return
         self.cancel_book_form()
+        if editing:
+            self.thumbnails.clear()
         self.refresh_books()
         self.show_live()
+        if editing:
+            self.status.setText(notice or f"Book details saved. Images: {self.library.image_folder(self.book)}")
 
     def edit_book(self):
         if self.book and self.pending.isNull() and self.capture_id is None:
             self.book_form.populate(self.book)
             self.book_form.show()
             self.book_form.title.setFocus()
+
+    def move_page(self, direction):
+        row = self.pages.currentRow()
+        if not self.book or row < 0 or not 0 <= row + direction < len(self.book['pages']):
+            return
+        order = list(range(len(self.book['pages'])))
+        order.insert(row + direction, order.pop(row))
+        self.reorder_pages(order, row)
+
+    def pages_dropped(self):
+        item = self.pages.currentItem()
+        selected = item.data(Qt.ItemDataRole.UserRole) if item else None
+        order = [self.pages.item(row).data(Qt.ItemDataRole.UserRole) for row in range(self.pages.count())]
+        self.reorder_pages(order, selected)
+
+    def reorder_pages(self, order, selected):
+        if not self.book or not self.pending.isNull() or self.capture_id is not None:
+            return
+        try:
+            self.library.reorder_pages(self.book, order)
+        except Exception as exc:
+            self.refresh_pages()
+            if selected is not None:
+                self.pages.setCurrentRow(selected)
+            self.error(f"Pages were not reordered: {exc}. Original order and images were kept.")
+            return
+        self.thumbnails.clear()
+        self.refresh_pages()
+        if selected is not None:
+            self.pages.setCurrentRow(order.index(selected))
+        self.status.setText("Page order saved. Image filenames now follow the sidebar order.")
+        self.update_controls()
 
     def edit_selected_page(self):
         row = self.pages.currentRow()
@@ -773,6 +843,9 @@ class ScanWindow(QMainWindow):
         page_selected = self.book is not None and self.pages.currentRow() >= 0
         self.edit_page_button.setEnabled(page_selected and not pending and not busy)
         self.remove_page_button.setEnabled(page_selected and not pending and not busy)
+        row = self.pages.currentRow()
+        self.move_up_button.setEnabled(ready and page_selected and row > 0)
+        self.move_down_button.setEnabled(ready and page_selected and row + 1 < len(self.book['pages']))
         self.done_button.setEnabled(not busy)
         self.export_button.setEnabled(bool(self.book and self.book["pages"]) and not busy and not pending)
 

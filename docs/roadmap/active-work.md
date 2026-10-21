@@ -183,3 +183,54 @@ queue item or let `docs/roadmap/` become a plan archive.
   shared folders without cross-book inclusion, disabled empty selection, Save As
   cancellation and overwrite confirmation. CodeGraph is current and `litai verify`
   passes all four configured gates; HTML observability is not configured.
+
+### [x] BOOKSCAN-007 — Reorder saved pages and renumber image files
+
+- **Priority:** high
+- **Owner:** components/legacy-project-wrapper
+- **Direction:** Allow page reordering in the sidebar, renaming files to match.
+- **Conclusion:** Add internal drag/drop and keyboard-accessible Move up/down actions; persist ordered pages and numbered filenames without losing scans on failure or changing other books.
+- **Depends on:** none
+- **Implementation:**
+  - [x] Implement transactional file renumbering and persistent page order
+  - [x] Add sidebar drag/drop and move buttons with selection and busy-state handling
+  - [x] Update user documentation and regression coverage
+- **Evidence:**
+  - [x] Reordering, persistence, image identity, failure rollback and sidebar interaction checks pass
+  - [x] Full regression suite, retained harness and litai verify pass
+
+- **Results:** The disposable retained harness passes all 110 regression/smoke
+  tests. Coverage includes sidebar model moves, move-button keyboard events,
+  selected-image preservation, capture/edit guards, numbered relative and custom
+  absolute paths, reopening, legacy/shared images, PDF page order, invalid
+  permutations, partial copy failure, missing images and manifest-save rollback.
+  The 1180x800 Qt sidebar layout was inspected. CodeGraph is current; `litai verify`
+  passes all four configured gates (HTML observability is not configured).
+  No peer issues, reviews or collectable branches/worktrees were found.
+
+### [x] BOOKSCAN-008 — Keep book titles and image directory names in sync
+
+- **Priority:** high
+- **Owner:** components/legacy-project-wrapper
+- **Direction:** When book editing is confirmed with a new name, move its directory and update saved paths.
+- **Conclusion:** Preview a collision-safe portable sibling directory while editing. On confirmation, move the entire directory and persist relative or absolute page references with the title; preserve originals until metadata commits, block unsafe shared/library-root moves, and retain retryable edits on failure.
+- **Depends on:** none
+- **Implementation:**
+  - [x] Implement directory destination planning and recoverable rename with page-path updates
+  - [x] Show edit-time destination preview and refresh sidebar, thumbnails and export paths on save
+  - [x] Update rename regression tests and user documentation
+- **Evidence:**
+  - [x] Default, custom and legacy folders, collisions, cancel, unchanged title and failed moves/saves preserve expected state
+  - [x] Full regression/smoke suite, retained receipt and litai verify pass
+
+- **Results:** All 126 regression/smoke tests pass in the source tree, disposable
+  retained harness and installed wheel. Rename fixtures cover default/custom/legacy
+  folders, empty and populated books, complete folder contents, portable collision
+  handling and preview races, cancellation, unchanged titles, shared-folder/root
+  protection, missing folders, partial copies, manifest failures and cleanup errors.
+  Reopened libraries, captures, previews and PDF exports use the updated paths.
+  The edit preview was inspected at 1180x800. The wheel was built and installed,
+  its payload matched byte-for-byte, desktop integration validated and dependencies
+  passed `pip check`. The running user window was preserved; restart loads the update.
+  Retained evidence is current and `litai verify` passes all four configured gates;
+  HTML observability is not configured. No peer contributions require collection.

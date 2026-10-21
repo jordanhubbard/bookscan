@@ -1,5 +1,7 @@
 """Durable book collections. Only explicitly accepted images are stored."""
 import json
+import shutil
+import warnings
 import os
 import re
 import tempfile
@@ -130,19 +132,83 @@ class Library:
     def image_folder(self, book):
         return Path(book["image_folder"]) if book.get("image_folder") else self.root / "books" / book.get('folder_name', book["id"])
 
-    def update_book(self, book, title, kind, author):
+    def renamed_book_folder(self, book, title):
+        """Preview a title-based sibling without creating or moving anything."""
+        folder = self.image_folder(book)
+        if title.strip() == book['title']:
+            return folder
+        stem = portable_book_name(title)
+        if folder.name == stem:
+            return folder
+        used = {entry.name.casefold() for entry in folder.parent.iterdir()
+                if entry != folder} if folder.parent.exists() else set()
+        used.update(self.image_folder(other).name.casefold() for other in self.books
+                    if other is not book and self.image_folder(other).parent == folder.parent)
+        name, counter = stem, 2
+        while name.casefold() in used:
+            suffix = f'-{counter}'
+            name = stem[:64 - len(suffix)].rstrip('-') + suffix
+            counter += 1
+        return folder.with_name(name)
+
+    def update_book(self, book, title, kind, author, expected_folder=None):
         if book not in self.books:
             raise ValueError("This book is no longer in the library")
         if not title.strip():
             raise ValueError("Enter a book title")
         previous = dict(book)
-        book.update(title=title.strip(), kind=kind, author=author.strip())
+        folder = self.image_folder(book)
+        destination = self.renamed_book_folder(book, title)
+        if expected_folder is not None and Path(expected_folder) != destination:
+            raise ValueError("That folder is no longer available. Review the updated destination and save again.")
+        moving = destination != folder
+        created = False
         try:
+            if moving:
+                if folder.is_symlink() or self.root.is_relative_to(folder.resolve()):
+                    raise ValueError("Renaming requires a dedicated book folder, not the library or a symbolic link")
+                if not folder.is_dir():
+                    raise OSError(f"The book's image folder is unavailable: {folder}. Reconnect it and retry Save book.")
+                source = folder.resolve()
+                for other in self.books:
+                    if other is not book and (self.image_folder(other).resolve().is_relative_to(source) or
+                            any(self.page_path(page).is_relative_to(source) for page in other['pages'])):
+                        raise ValueError("This image folder is shared with another book. Give each book a dedicated folder before renaming.")
+                pages = []
+                for page in book['pages']:
+                    path = self.page_path(page)
+                    if path.is_relative_to(source):
+                        path = destination / path.relative_to(source)
+                        pages.append(str(path) if Path(page).is_absolute()
+                                     else path.relative_to(self.root).as_posix())
+                    else:
+                        pages.append(page)
+                # Reserve without merging; retain originals until the manifest commits.
+                destination.mkdir(exist_ok=False)
+                created = True
+                shutil.copytree(folder, destination, symlinks=True, dirs_exist_ok=True)
+                book['pages'] = pages
+                if book.get('image_folder'):
+                    book['image_folder'] = str(destination)
+                else:
+                    book['folder_name'] = destination.name
+            book.update(title=title.strip(), kind=kind, author=author.strip())
             self.save()
         except Exception:
             book.clear()
             book.update(previous)
+            if created:
+                try:
+                    shutil.rmtree(destination)
+                except OSError:
+                    pass  # Keep the original folder and metadata authoritative.
             raise
+        if moving:
+            try:
+                shutil.rmtree(folder)
+            except OSError as exc:
+                return f"Book renamed and saved. Some old files remain at {folder}: {exc}"
+        return None
 
     def remove_book(self, book, delete_images=False):
         index = self.books.index(book)
@@ -179,6 +245,49 @@ class Library:
         except Exception:
             book['pages'].insert(index, page)
             raise
+
+    def reorder_pages(self, book, order):
+        """Persist a permutation, keeping originals until the manifest commits."""
+        if book not in self.books:
+            raise ValueError("This book is no longer in the library")
+        old = book['pages'][:]
+        if any(type(index) is not int for index in order) or sorted(order) != list(range(len(old))):
+            raise ValueError("Page order must contain every page exactly once")
+        if order == list(range(len(old))):
+            return
+        created, pages = [], []
+        try:
+            for number, index in enumerate(order, 1):
+                original = self.page_path(old[index])
+                prefix = f"page-{number:04d}-"
+                if original.name.startswith(prefix):
+                    pages.append(old[index])
+                    continue
+                destination = original.with_name(f"{prefix}{uuid4().hex}{original.suffix}")
+                # Exclusive creation prevents overwriting even unrelated folder contents.
+                with original.open('rb') as source, destination.open('xb') as target:
+                    created.append(destination)
+                    shutil.copyfileobj(source, target)
+                pages.append(str(destination) if Path(old[index]).is_absolute()
+                             else destination.relative_to(self.root).as_posix())
+            book['pages'] = pages
+            self.save()
+        except Exception:
+            book['pages'] = old
+            for path in created:
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError:
+                    pass  # Originals remain authoritative; never sacrifice them for cleanup.
+            raise
+        referenced = {self.page_path(page) for entry in self.books for page in entry['pages']}
+        for page in old:
+            path = self.page_path(page)
+            if path not in referenced:
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError as exc:
+                    warnings.warn(f"Page order saved; old image kept at {path}: {exc}")
 
     def update_page(self, book, index, image):
         if book not in self.books:

@@ -41,3 +41,9 @@ export UI with one chosen book folder and one output PDF containing all saved pa
 
 BOOKSCAN-006 derives PDF source and default output path from the selected book,
 removing the redundant source-folder chooser.
+
+BOOKSCAN-007 adds sidebar page reordering with numbered image filenames and
+persistent PDF order.
+
+BOOKSCAN-008 synchronizes edited book titles with their image directory names
+and saved page paths when Save book is confirmed.

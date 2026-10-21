@@ -671,7 +671,7 @@ def test_inline_creation_error_preserves_draft(window, tmp_path):
     assert QApplication.activeModalWidget() is None
 
 
-def test_edit_book_metadata_preserves_folder_and_images(window, image, tmp_path):
+def test_edit_book_moves_folder_and_images(window, image, tmp_path):
     book = window.library.add_book('Original', image_folder=tmp_path / 'Scans')
     page = window.library.accept(book, image)
     window.refresh_books()
@@ -685,9 +685,13 @@ def test_edit_book_metadata_preserves_folder_and_images(window, image, tmp_path)
     saved = Library(window.library.root).books[0]
     assert saved['title'] == 'Renamed' and saved['author'] == 'New author'
     assert saved['kind'] == 'Magazine'
-    assert saved['pages'] == [page]
-    assert saved['image_folder'] == str(tmp_path / 'Scans')
-    assert QImage(page) == image
+    assert saved['pages'] == [str(tmp_path / 'renamed' / Path(page).name)]
+    assert saved['image_folder'] == str(tmp_path / 'renamed')
+    assert not (tmp_path / 'Scans').exists()
+    assert QImage(saved['pages'][0]) == image
+    assert str(tmp_path / 'renamed') in window.location.text()
+    window.pages.setCurrentRow(0)
+    assert window.preview.image == image
 
 
 def test_edit_saved_page_cancel_then_save_updates_in_place(window, image):
@@ -1001,7 +1005,10 @@ def test_existing_id_based_book_keeps_original_folder(library, image):
     reopened = Library(library.root)
     assert reopened.image_folder(reopened.books[0]) == library.root / 'books' / ('a' * 32)
     library.update_book(book, 'New title', 'Notebook', '')
-    assert library.image_folder(book).name == 'a' * 32
+    assert library.image_folder(book).name == 'new-title'
+    assert not (library.root / 'books' / ('a' * 32)).exists()
+    assert book['folder_name'] == 'new-title'
+    assert QImage(str(library.page_path(book['pages'][0]))) == image
 
 
 def test_new_named_folder_failure_rolls_back_reservation(library, monkeypatch):
@@ -1291,3 +1298,351 @@ def test_dynamic_button_labels_preserve_shortcuts(window, image):
     assert window.book_form.submit_button.shortcut().toString() == 'Alt+Return'
     window.book_form.populate()
     assert window.book_form.submit_button.shortcut().toString() == 'Alt+Return'
+
+
+@pytest.mark.parametrize('custom', [False, True])
+def test_reorder_persists_numbered_files_and_images(library, image, tmp_path, custom):
+    book = library.add_book('Reorder', image_folder=str(tmp_path / 'scans') if custom else None)
+    old = []
+    for color in ['red', 'green', 'blue']:
+        image.fill(color)
+        old.append(library.accept(book, image))
+    unrelated = library.image_folder(book) / 'notes.txt'
+    unrelated.write_text('keep')
+    library.reorder_pages(book, [2, 0, 1])
+    reopened = Library(library.root)
+    assert reopened.books[0]['pages'] == book['pages']
+    assert [library.page_path(p).name[:10] for p in book['pages']] == [
+        'page-0001-', 'page-0002-', 'page-0003-']
+    assert [QImage(str(library.page_path(p))).pixelColor(0, 0).name() for p in book['pages']] == [
+        '#0000ff', '#ff0000', '#008000']
+    assert not any(library.page_path(p).exists() for p in old)
+    assert len(list(library.image_folder(book).glob('*.png'))) == 3
+    assert unrelated.read_text() == 'keep'
+    library.accept(book, image)
+    assert library.page_path(book['pages'][-1]).name.startswith('page-0004-')
+
+
+@pytest.mark.parametrize('failure', ['save', 'copy', 'missing'])
+def test_reorder_failure_keeps_originals(library, image, monkeypatch, failure):
+    import bookscan.library as module
+    book = library.add_book('Failure')
+    for _ in range(3):
+        library.accept(book, image)
+    old = book['pages'][:]
+    manifest = library.path.read_bytes()
+    if failure == 'missing':
+        library.page_path(old[0]).unlink()
+    before = {p.name: p.read_bytes() for p in library.image_folder(book).glob('*.png')}
+    def fail(*args):
+        raise OSError('disk failure')
+    if failure == 'save':
+        monkeypatch.setattr(library, 'save', fail)
+    elif failure == 'copy':
+        original = module.shutil.copyfileobj
+        count = 0
+        def copy(source, target):
+            nonlocal count
+            count += 1
+            if count == 2:
+                target.write(b'partial')
+                fail()
+            original(source, target)
+        monkeypatch.setattr(module.shutil, 'copyfileobj', copy)
+    with pytest.raises(OSError):
+        library.reorder_pages(book, [2, 0, 1])
+    assert book['pages'] == old
+    assert library.path.read_bytes() == manifest
+    assert {p.name: p.read_bytes() for p in library.image_folder(book).glob('*.png')} == before
+
+
+def test_reorder_preserves_shared_and_legacy_images(library, image):
+    book = library.add_book('Legacy')
+    old = [library.accept(book, image), library.accept(book, image)]
+    legacy = library.page_path(old[0]).with_name('scan.png')
+    library.page_path(old[0]).rename(legacy)
+    book['pages'][0] = legacy.relative_to(library.root).as_posix()
+    other = library.add_book('Shared')
+    other['pages'] = [book['pages'][0]]
+    library.save()
+    library.reorder_pages(book, [1, 0])
+    assert legacy.is_file()
+    assert Library(library.root).books[1]['pages'] == other['pages']
+    assert library.page_path(book['pages'][1]).name.startswith('page-0002-')
+    assert QImage(str(library.page_path(other['pages'][0]))) == image
+
+
+@pytest.mark.parametrize('order', [[0, 0], [0], [1, 2], [True, 0]])
+def test_reorder_rejects_invalid_permutations(library, image, order):
+    book = library.add_book('Invalid')
+    library.accept(book, image)
+    library.accept(book, image)
+    old = book['pages'][:]
+    with pytest.raises(ValueError):
+        library.reorder_pages(book, order)
+    assert book['pages'] == old
+
+
+def test_sidebar_move_buttons_selection_preview_and_busy(window, image):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    window.book = window.library.add_book('Sidebar')
+    for color in ['red', 'blue', 'green']:
+        image.fill(color)
+        window.library.accept(window.book, image)
+    window.refresh_books()
+    window.pages.setCurrentRow(0)
+    assert not window.move_up_button.isEnabled()
+    assert window.move_down_button.isEnabled()
+    window.show()
+    window.activateWindow()
+    QApplication.processEvents()
+    QTest.keyClick(window, Qt.Key.Key_Down, Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+    QTest.qWait(180)  # Qt animates shortcut-triggered button clicks.
+    assert window.pages.currentRow() == 1
+    assert window.preview.image.pixelColor(0, 0).name() == '#ff0000'
+    assert [window.pages.item(i).text() for i in range(3)] == ['Page 1', 'Page 2', 'Page 3']
+    window.move_down_button.click()
+    assert window.pages.currentRow() == 2
+    assert not window.move_down_button.isEnabled()
+    window.edit_selected_page()
+    assert not window.move_up_button.isEnabled()
+    old = window.book['pages'][:]
+    window.move_page(-1)
+    assert window.book['pages'] == old
+    window.cancel_snapshot()
+    window.capture_id = 123
+    window.update_controls()
+    assert not window.move_up_button.isEnabled()
+
+
+def test_sidebar_drop_order_and_failure_recovery(window, image, monkeypatch):
+    window.book = window.library.add_book('Drop')
+    for color in ['red', 'blue', 'green']:
+        image.fill(color)
+        window.library.accept(window.book, image)
+    window.refresh_books()
+    # Model movement is the operation performed by Qt's internal drop handling.
+    assert window.pages.model().moveRow(window.pages.rootIndex(), 0, window.pages.rootIndex(), 3)
+    window.pages.setCurrentRow(2)
+    window.pages_dropped()
+    assert window.preview.image.pixelColor(0, 0).name() == '#ff0000'
+    assert window.pages.currentRow() == 2
+    old = window.book['pages'][:]
+    monkeypatch.setattr(window.library, 'save', lambda: (_ for _ in ()).throw(OSError('disk full')))
+    errors = []
+    monkeypatch.setattr(window, 'error', errors.append)
+    window.move_page(-1)
+    assert window.book['pages'] == old
+    assert window.pages.currentRow() == 2
+    assert window.preview.image.pixelColor(0, 0).name() == '#ff0000'
+    assert 'Original order' in errors[0]
+
+
+def test_reordered_pdf_uses_sidebar_order(window, image):
+    window.book = window.library.add_book('Reordered PDF')
+    for color in ['red', 'blue', 'green']:
+        image.fill(color)
+        window.library.accept(window.book, image)
+    window.refresh_books()
+    window.pages.setCurrentRow(0)
+    window.move_page(1)
+    window.move_page(1)
+    destination = window.library.root / 'reordered.pdf'
+    window.library.export_pdf(window.book, destination)
+    document = QPdfDocument()
+    assert document.load(str(destination)) == QPdfDocument.Error.None_
+    assert document.pageCount() == 3
+    # PDF image encoding/rendering may round a channel by a few levels.
+    for i, expected in enumerate([(0, 0, 255), (0, 128, 0), (255, 0, 0)]):
+        color = document.render(i, image.size()).pixelColor(300, 400)
+        assert all(abs(actual - target) <= 3 for actual, target in
+                   zip((color.red(), color.green(), color.blue()), expected))
+    document.close()
+
+
+@pytest.mark.parametrize('custom', [False, True])
+@pytest.mark.parametrize('with_pages', [False, True])
+def test_rename_moves_whole_directory_and_reopens(library, image, tmp_path, custom, with_pages):
+    book = library.add_book('Original', image_folder=tmp_path / 'Custom scans' if custom else None)
+    folder = library.image_folder(book)
+    if with_pages:
+        library.accept(book, image)
+        image.fill('blue')
+        library.accept(book, image)
+    old = book['pages'][:]
+    before = [library.page_path(page).read_bytes() for page in old]
+    (folder / 'extras').mkdir()
+    (folder / 'extras' / 'notes.txt').write_text('Keep all folder contents')
+    (folder / 'export.pdf').write_bytes(b'Existing PDF')
+    destination = folder.with_name('new-book')
+    assert library.renamed_book_folder(book, 'New Book') == destination
+    assert not destination.exists()
+    assert library.update_book(book, ' New Book ', 'Notebook', ' Author ') is None
+    assert not folder.exists()
+    assert library.image_folder(book) == destination
+    assert [library.page_path(page).read_bytes() for page in book['pages']] == before
+    assert all(Path(page).is_absolute() == custom for page in book['pages'])
+    assert [Path(page).name for page in book['pages']] == [Path(page).name for page in old]
+    assert (destination / 'extras' / 'notes.txt').read_text() == 'Keep all folder contents'
+    assert (destination / 'export.pdf').read_bytes() == b'Existing PDF'
+    reopened = Library(library.root)
+    assert reopened.books[0] == book
+    assert reopened.image_folder(reopened.books[0]) == destination
+    library.accept(book, image)
+    assert library.page_path(book['pages'][-1]).parent == destination
+    output = destination / 'new-book.pdf'
+    library.export_pdf(book, output)
+    assert output.read_bytes().startswith(b'%PDF')
+
+
+def test_rename_preview_cancel_and_metadata_only_save(window, image, monkeypatch):
+    window.book = window.library.add_book('Original')
+    page = window.library.accept(window.book, image)
+    folder = window.library.image_folder(window.book)
+    window.refresh_books()
+    window.edit_book()
+    form = window.book_form
+    form.title.setText('New title')
+    assert form.destination == folder.with_name('new-title')
+    assert form.folder.text() == str(form.destination)
+    assert 'will move' in form.folder_preview.text()
+    assert folder.is_dir() and not form.destination.exists()
+    form.cancel_button.click()
+    assert window.book['title'] == 'Original'
+    assert window.book['pages'] == [page]
+    window.edit_book()
+    form.author.setText('New author')
+    form.kind.setCurrentText('Magazine')
+    monkeypatch.setattr('bookscan.library.shutil.copytree', lambda *args, **kwargs: pytest.fail('Unchanged name must not move files'))
+    form.submit_button.click()
+    assert window.book['title'] == 'Original'
+    assert window.book['author'] == 'New author'
+    assert window.book['kind'] == 'Magazine'
+    assert window.library.image_folder(window.book) == folder
+    assert window.book['pages'] == [page]
+
+
+def test_rename_uses_portable_collision_safe_preview(window, image):
+    window.book = window.library.add_book('Original')
+    window.library.accept(window.book, image)
+    parent = window.library.image_folder(window.book).parent
+    (parent / 'BOOK-CON').mkdir()
+    (parent / 'BOOK-CON' / 'keep.txt').write_text('keep')
+    window.edit_book()
+    form = window.book_form
+    form.title.setText('CON')
+    assert form.destination == parent / 'book-con-2'
+    # A folder appears after preview; saving must require review of a new path.
+    form.destination.mkdir()
+    (form.destination / 'keep.txt').write_text('also keep')
+    form.submit_button.click()
+    assert window.book['title'] == 'Original'
+    assert form.destination == parent / 'book-con-3'
+    assert form.error_label.isVisibleTo(form)
+    form.submit_button.click()
+    assert window.book['title'] == 'CON'
+    assert window.library.image_folder(window.book) == parent / 'book-con-3'
+    assert (parent / 'BOOK-CON' / 'keep.txt').read_text() == 'keep'
+    assert (parent / 'book-con-2' / 'keep.txt').read_text() == 'also keep'
+
+
+@pytest.mark.parametrize('failure', ['copy', 'save', 'missing', 'race'])
+def test_failed_book_rename_preserves_originals_and_edit_form(window, image, monkeypatch, failure):
+    import bookscan.library as module
+    window.book = window.library.add_book('Original')
+    page = window.library.accept(window.book, image)
+    folder = window.library.image_folder(window.book)
+    contents = window.library.page_path(page).read_bytes()
+    manifest = window.library.path.read_bytes()
+    window.refresh_books()
+    window.edit_book()
+    form = window.book_form
+    form.title.setText('Renamed')
+    destination = form.destination
+    if failure == 'copy':
+        def fail_copy(source, target, **kwargs):
+            (target / 'partial').write_bytes(b'partial')
+            raise OSError('disk full')
+        monkeypatch.setattr(module.shutil, 'copytree', fail_copy)
+    elif failure == 'save':
+        monkeypatch.setattr(window.library, 'save', lambda: (_ for _ in ()).throw(OSError('disk full')))
+    elif failure == 'missing':
+        folder.rename(folder.with_name('disconnected'))
+    else:
+        original_mkdir = Path.mkdir
+        def race(path, *args, **kwargs):
+            if path == destination:
+                original_mkdir(path)
+                (path / 'keep').write_text('external contents')
+                raise FileExistsError('just created elsewhere')
+            return original_mkdir(path, *args, **kwargs)
+        monkeypatch.setattr(Path, 'mkdir', race)
+    form.submit_button.click()
+    assert window.book['title'] == 'Original'
+    assert window.book['pages'] == [page]
+    assert window.library.path.read_bytes() == manifest
+    assert form.title.text() == 'Renamed'
+    assert not form.isHidden() and not form.error_label.isHidden()
+    if failure != 'missing':
+        assert window.library.page_path(page).read_bytes() == contents
+    if failure == 'race':
+        assert (destination / 'keep').read_text() == 'external contents'
+    else:
+        assert not destination.exists()
+    monkeypatch.undo()  # Window teardown must be able to save normally.
+
+
+@pytest.mark.parametrize('sharing', ['folder', 'page', 'nested'])
+def test_rename_refuses_to_move_another_books_files(library, image, tmp_path, sharing):
+    folder = tmp_path / 'shared'
+    book = library.add_book('First', image_folder=folder)
+    page = library.accept(book, image)
+    other = library.add_book('Other', image_folder=folder if sharing == 'folder' else
+                             folder / 'nested' if sharing == 'nested' else None)
+    if sharing == 'page':
+        other['pages'].append(page)
+        library.save()
+    before = library.path.read_bytes()
+    with pytest.raises(ValueError, match='shared'):
+        library.update_book(book, 'Renamed', 'Other', '')
+    assert library.path.read_bytes() == before
+    assert Path(page).exists()
+    assert folder.exists() and not folder.with_name('renamed').exists()
+
+
+def test_rename_refuses_library_root_folder(library, image):
+    book = library.add_book('Root', image_folder=library.root)
+    library.accept(book, image)
+    before = library.path.read_bytes()
+    with pytest.raises(ValueError, match='dedicated'):
+        library.update_book(book, 'Renamed', 'Other', '')
+    assert library.path.read_bytes() == before
+
+
+def test_title_change_with_identical_portable_name_keeps_files(library, image, monkeypatch):
+    book = library.add_book('My Book')
+    page = library.accept(book, image)
+    monkeypatch.setattr('bookscan.library.shutil.copytree', lambda *args, **kwargs: pytest.fail('Same path must not be copied'))
+    library.update_book(book, 'MY BOOK!', 'Other', '')
+    assert book['title'] == 'MY BOOK!'
+    assert book['pages'] == [page]
+    assert library.image_folder(book).name == 'my-book'
+
+
+def test_rename_reports_old_folder_cleanup_failure(library, image, monkeypatch):
+    import bookscan.library as module
+    book = library.add_book('Original')
+    library.accept(book, image)
+    folder = library.image_folder(book)
+    original_rmtree = module.shutil.rmtree
+    def fail_cleanup(path, *args, **kwargs):
+        if path == folder:
+            raise OSError('permission denied')
+        return original_rmtree(path, *args, **kwargs)
+    monkeypatch.setattr(module.shutil, 'rmtree', fail_cleanup)
+    notice = library.update_book(book, 'Renamed', 'Other', '')
+    assert str(folder) in notice and 'old files remain' in notice
+    assert Library(library.root).books[0] == book
+    assert book['title'] == 'Renamed'
+    assert QImage(str(library.page_path(book['pages'][0]))) == image
