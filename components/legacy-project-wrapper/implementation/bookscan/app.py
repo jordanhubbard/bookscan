@@ -3,6 +3,7 @@ import argparse
 import math
 from pathlib import Path
 import sys
+import time
 import tempfile
 from uuid import uuid4
 
@@ -18,6 +19,8 @@ from PySide6.QtWidgets import (
 )
 
 from .library import Library, portable_book_name
+from .autocapture import AutoCaptureDetector, sample_frame
+from .autocapture_dialog import AutoCaptureSettings
 from .imaging import black_background_rect
 from .desktop import ICON_PATH, install_desktop
 
@@ -461,6 +464,12 @@ class ScanWindow(QMainWindow):
         self.auto_trim = QCheckBox("Auto-trim black background")
         self.auto_trim.setToolTip("Automatically trim new snapshots against a black background. Reset edits restores the original image.")
         zoom_controls.addWidget(self.auto_trim)
+        self.auto_capture = QCheckBox("Auto-capture")
+        self.auto_capture.setToolTip("Capture automatically when a page is placed on the black background and stays still for 3 seconds. Remove the page to re-arm.")
+        self.auto_capture.toggled.connect(self.toggle_auto_capture)
+        zoom_controls.addWidget(self.auto_capture)
+        self.auto_settings_button = self.button("Tune…", self.show_auto_settings, zoom_controls)
+        self.auto_settings_button.setToolTip("Tune auto-capture thresholds and preview detection without saving pages")
         self.preview.viewChanged.connect(self.update_controls)
         right.addLayout(zoom_controls)
         edits = QHBoxLayout()
@@ -493,6 +502,10 @@ class ScanWindow(QMainWindow):
         self.install_shortcuts()
         self.session = QMediaCaptureSession(self)
         self.session.setVideoOutput(self.video)
+        self.detector = AutoCaptureDetector()
+        self.auto_settings = AutoCaptureSettings(self.detector, self)
+        self.last_sample = 0.0
+        self.video.videoSink().videoFrameChanged.connect(self.watch_frame)
         self.capture = QImageCapture(self)
         self.session.setImageCapture(self.capture)
         self.capture.imageSaved.connect(self.snapshot_saved)
@@ -536,6 +549,8 @@ class ScanWindow(QMainWindow):
             (self.next_button, "Ctrl+Shift+N", "Next book"),
             (self.done_button, "Ctrl+Q", "Save and quit"),
             (self.auto_trim, "Ctrl+T", "Toggle auto-trim"),
+            (self.auto_capture, "Ctrl+Shift+A", "Toggle auto-capture"),
+            (self.auto_settings_button, "Ctrl+Shift+T", "Tune auto-capture"),
             (self.book_form.submit_button, "Alt+Return", "Create book / save book details"),
             (self.book_form.cancel_button, "Alt+C", "Cancel book form"),
             (self.book_form.browse_folder_button, "Alt+O", "Browse image folder"),
@@ -848,6 +863,39 @@ class ScanWindow(QMainWindow):
         self.move_down_button.setEnabled(ready and page_selected and row + 1 < len(self.book['pages']))
         self.done_button.setEnabled(not busy)
         self.export_button.setEnabled(bool(self.book and self.book["pages"]) and not busy and not pending)
+
+    def toggle_auto_capture(self, enabled):
+        self.detector.reset()
+        self.status.setText("Auto-capture on: place a page on the black background and hold it still." if enabled else "Auto-capture off.")
+
+    def show_auto_settings(self):
+        self.auto_settings.show()
+        self.auto_settings.raise_()
+
+    def watch_frame(self, frame):
+        previewing = self.auto_settings.isVisible() and self.auto_settings.preview.isChecked()
+        now = time.monotonic()
+        if not (self.auto_capture.isChecked() or self.auto_settings.isVisible()) or now - self.last_sample < 0.2:
+            return
+        self.last_sample = now
+        live = (self.camera is not None and self.pending.isNull() and self.capture_id is None
+                and self.stack.currentWidget() is self.video)
+        if not previewing:
+            live = live and self.auto_capture.isChecked() and self.book is not None and self.capture.isReadyForCapture()
+        if not live:
+            self.detector.pause()
+            return
+        image = frame.toImage()
+        if image.isNull():
+            return
+        fired = self.detector.feed(sample_frame(image), now)
+        self.auto_settings.show_readings()
+        if fired and previewing:
+            self.status.setText("Auto-capture preview: a page would be captured now (nothing saved). Remove the page to re-arm.")
+        elif fired:
+            self.take_snapshot()
+        elif not fired:
+            self.status.setText(f"Auto-capture{' preview' if previewing else ''}: {self.detector.state}")
 
     def capture_or_save(self):
         if self.capture_id is not None:
