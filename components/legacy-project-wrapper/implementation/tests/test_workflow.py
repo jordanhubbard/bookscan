@@ -1693,3 +1693,16 @@ def test_rescan_cancel_and_page_selection_leave_rescan_mode(window, image):
     window.pages.setCurrentRow(1)
     assert window.rescan_row is None
     window.camera = None
+
+
+def test_selecting_a_book_shows_its_first_page(window, image):
+    book = window.library.add_book("Has pages")
+    window.library.accept(book, image)
+    window.library.accept(book, image)
+    empty = window.library.add_book("No pages")
+    window.refresh_books()
+    window.select_book(window.library.books.index(book))
+    assert window.pages.currentRow() == 0
+    assert window.stack.currentWidget() is window.preview
+    window.select_book(window.library.books.index(empty))
+    assert window.pages.currentRow() == -1

@@ -637,6 +637,8 @@ class ScanWindow(QMainWindow):
         self.rescan_row = None
         self.refresh_pages()
         self.show_live()
+        if self.book['pages'] and self.pending.isNull():
+            self.pages.setCurrentRow(0)
 
     def choose_book(self):
         if self.book_form.editing_book is not None:
