@@ -357,6 +357,7 @@ class ScanWindow(QMainWindow):
         self.library = library
         self.book = None
         self.editing_page = None
+        self.rescan_row = None
         self.pending = QImage()
         self.original = QImage()
         self.source = None
@@ -411,6 +412,8 @@ class ScanWindow(QMainWindow):
         left.addWidget(self.pages, 2)
         page_actions = QHBoxLayout()
         self.edit_page_button = self.button("Edit page", self.edit_selected_page, page_actions)
+        self.rescan_button = self.button("Rescan page", self.start_rescan, page_actions)
+        self.rescan_button.setToolTip("Capture the selected page again with the camera and replace its image in place")
         self.remove_page_button = self.button("Delete page", self.request_remove_page, page_actions)
         left.addLayout(page_actions)
         move_actions = QHBoxLayout()
@@ -533,6 +536,7 @@ class ScanWindow(QMainWindow):
             (self.edit_book_button, "Ctrl+Shift+E", "Edit book"),
             (self.remove_book_button, "Ctrl+Shift+Delete", "Delete book"),
             (self.edit_page_button, "Ctrl+E", "Edit selected page"),
+            (self.rescan_button, "Ctrl+Shift+C", "Rescan selected page"),
             (self.remove_page_button, "Ctrl+Delete", "Delete selected page"),
             (self.move_up_button, "Ctrl+Shift+Up", "Move selected page up"),
             (self.move_down_button, "Ctrl+Shift+Down", "Move selected page down"),
@@ -630,6 +634,7 @@ class ScanWindow(QMainWindow):
         if row < 0 or row >= len(self.library.books):
             return
         self.book = self.library.books[row]
+        self.rescan_row = None
         self.refresh_pages()
         self.show_live()
 
@@ -725,6 +730,15 @@ class ScanWindow(QMainWindow):
         self.auto_trim.setChecked(trim)
         self.editing_page = row
         self.review_status()
+
+    def start_rescan(self):
+        row = self.pages.currentRow()
+        if not self.book or row < 0 or self.camera is None or not self.pending.isNull() or self.capture_id is not None:
+            return
+        self.show_live()
+        self.rescan_row = row
+        self.status.setText(f"Rescanning page {row + 1}: place the sheet, then Capture (Ctrl+S) to replace it in place. Cancel (Esc) keeps the saved page.")
+        self.update_controls()
 
     def request_remove_book(self):
         if self.book:
@@ -833,7 +847,7 @@ class ScanWindow(QMainWindow):
         set_button_text(self.capture_button, "Save" if pending else "Capture")
         self.capture_button.setEnabled(not busy and ((pending and not cropping) or
                                        (ready and self.camera is not None and self.capture.isReadyForCapture())))
-        self.cancel_button.setEnabled(pending or busy)
+        self.cancel_button.setEnabled(pending or busy or self.rescan_row is not None)
         self.auto_trim.setEnabled(not pending and not busy)
         self.import_button.setEnabled(ready)
         self.rotate_button.setEnabled(pending and not cropping)
@@ -857,6 +871,7 @@ class ScanWindow(QMainWindow):
         self.remove_book_button.setEnabled(self.book is not None and not pending and not busy)
         page_selected = self.book is not None and self.pages.currentRow() >= 0
         self.edit_page_button.setEnabled(page_selected and not pending and not busy)
+        self.rescan_button.setEnabled(page_selected and self.camera is not None and not pending and not busy)
         self.remove_page_button.setEnabled(page_selected and not pending and not busy)
         row = self.pages.currentRow()
         self.move_up_button.setEnabled(ready and page_selected and row > 0)
@@ -914,6 +929,7 @@ class ScanWindow(QMainWindow):
         self.pending = QImage()
         self.original = QImage()
         self.editing_page = None
+        self.rescan_row = None
         self.show_live()
         self.status.setText("Snapshot cancelled. Position the page, then Capture again.")
 
@@ -944,9 +960,13 @@ class ScanWindow(QMainWindow):
         reader.setAutoTransform(True)
         image = reader.read()
         Path(filename).unlink(missing_ok=True)
+        row, self.rescan_row = self.rescan_row, None
         self.present(image)
         if not self.pending.isNull():
-            self.accept_page()
+            if row is not None and row < len(self.book['pages']):
+                self.editing_page = row
+            if self.accept_page() and row is not None:
+                self.status.setText(f"Page {row + 1} replaced with the new scan.")
 
     def capture_error(self, capture_id, _code, message):
         if capture_id == self.capture_id:
@@ -1058,6 +1078,7 @@ class ScanWindow(QMainWindow):
 
     def review_page(self, row):
         if self.book and 0 <= row < len(self.book["pages"]):
+            self.rescan_row = None
             image = QImage(str(self.library.page_path(self.book["pages"][row])))
             if image.isNull():
                 self.error(f"Page {row + 1} is missing or unreadable")

@@ -1646,3 +1646,50 @@ def test_rename_reports_old_folder_cleanup_failure(library, image, monkeypatch):
     assert Library(library.root).books[0] == book
     assert book['title'] == 'Renamed'
     assert QImage(str(library.page_path(book['pages'][0]))) == image
+
+
+def test_rescan_replaces_selected_page_in_place(window, image, tmp_path):
+    window.book = window.library.add_book("Rescan")
+    for color in ("red", "green", "blue"):
+        page = QImage(image)
+        page.fill(color)
+        window.library.accept(window.book, page)
+    window.refresh_pages()
+    window.camera = object()  # Stand-in: rescan needs a live camera, not real frames.
+    window.pages.setCurrentRow(1)
+    old = window.book['pages'][:]
+    assert window.rescan_button.shortcut().toString()
+    window.update_controls()
+    assert window.rescan_button.isEnabled()
+    window.start_rescan()
+    assert window.rescan_row == 1
+    assert window.cancel_button.isEnabled()
+    fresh = QImage(image)
+    fresh.fill("yellow")
+    capture_path = tmp_path / "rescan.png"
+    fresh.save(str(capture_path))
+    window.capture_id = 51
+    window.snapshot_saved(51, str(capture_path))
+    assert window.rescan_row is None
+    assert len(window.book['pages']) == 3
+    assert window.book['pages'] == old
+    assert [QImage(str(window.library.page_path(p))).pixelColor(0, 0).name() for p in window.book['pages']] == ['#ff0000', '#ffff00', '#0000ff']
+    assert "Page 2 replaced" in window.status.text()
+    window.camera = None
+
+
+def test_rescan_cancel_and_page_selection_leave_rescan_mode(window, image):
+    window.book = window.library.add_book("Rescan cancel")
+    window.library.accept(window.book, image)
+    window.library.accept(window.book, image)
+    window.refresh_pages()
+    window.camera = object()
+    window.pages.setCurrentRow(0)
+    window.start_rescan()
+    window.cancel_snapshot()
+    assert window.rescan_row is None
+    window.pages.setCurrentRow(0)
+    window.start_rescan()
+    window.pages.setCurrentRow(1)
+    assert window.rescan_row is None
+    window.camera = None
