@@ -9,7 +9,15 @@ A camera is optional when importing existing images.
 
 ## Installation
 
-From a checkout on Linux:
+On Ubuntu/Debian, install Python environment support and Qt's native runtime
+libraries before installing the Python package:
+
+```sh
+sudo apt-get install python3-venv libegl1 libopengl0 libgl1 libxkbcommon0 libpulse0 libxcb-cursor0 libxkbcommon-x11-0
+```
+
+`libpulse0` is required by Qt Multimedia even when scanning without audio.
+A normal desktop usually already supplies these libraries. From a checkout on Linux:
 
 ```sh
 make install

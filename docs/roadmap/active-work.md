@@ -261,5 +261,8 @@ queue item or let `docs/roadmap/` become a plan archive.
   inspected. No camera is connected; camera-independent scanning workflows pass.
   Refreshed retained membership includes the previously omitted auto-capture
   modules and tests; the disposable harness now passes all 135 tests.
+- **Clean-host dependency repair:** GitHub Ubuntu qualification exposed missing
+  `libpulse.so.0`; CI now provisions `libpulse0` and installation documentation
+  lists the Qt native runtime prerequisites.
 - **Publication follow-through:** Commit, push, confirm exact-head GitHub CI,
   publish 1.0.1, verify remote artifacts, and install the released wheel.
