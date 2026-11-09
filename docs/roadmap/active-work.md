@@ -264,5 +264,15 @@ queue item or let `docs/roadmap/` become a plan archive.
 - **Clean-host dependency repair:** GitHub Ubuntu qualification exposed missing
   `libpulse.so.0`; CI now provisions `libpulse0` and installation documentation
   lists the Qt native runtime prerequisites.
-- **Publication follow-through:** Commit, push, confirm exact-head GitHub CI,
-  publish 1.0.1, verify remote artifacts, and install the released wheel.
+- **Publication result:** [PR #2](https://github.com/jordanhubbard/bookscan/pull/2)
+  landed after green source/installed-wheel CI. Released
+  [v1.0.1](https://github.com/jordanhubbard/bookscan/releases/tag/v1.0.1) at
+  `1c3c8f0f3744b3c449de0c22b6e12de0db2533b2` after exact-head CI and the
+  local 135-test release gate passed. Published wheel, source archive and
+  SHA256SUMS; downloaded assets pass both checksums. The installed 1.0.1 wheel
+  matches all nine application payload files and launches through the registered
+  desktop entry. GNOME favorites retain BookScan. Main advances to 1.1.0 for
+  development; the installed application remains the stable 1.0.1 release.
+- **Named skips:** The retained wrapper is untagged for native `litai package`,
+  so original-source wheel packaging applies. HTML observability, Jira association,
+  and descendant notifications are not configured. No camera hardware is attached.
