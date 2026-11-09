@@ -234,3 +234,32 @@ queue item or let `docs/roadmap/` become a plan archive.
   passed `pip check`. The running user window was preserved; restart loads the update.
   Retained evidence is current and `litai verify` passes all four configured gates;
   HTML observability is not configured. No peer contributions require collection.
+
+### [x] BOOKSCAN-009 — Repair build, install desktop application and publish release
+
+- **Release target:** 1.0.1
+- **Release goals:** [versioned manifest](release-goals.json)
+
+- **Priority:** high
+- **Owner:** retained implementation / build and release configuration
+- **Direction:** Fix build and installation issues, install and register Bookscan, pin it in the dock, commit, push and release on GitHub.
+- **Conclusion:** Repair the broken local Python environment and make installation build a durable installed wheel; qualify Linux ARM64 desktop launch and publish a version-consistent tested release.
+- **Depends on:** none
+- **Implementation:**
+  - [x] Repair reproducible build, installation and release configuration
+  - [x] Install the wheel, register desktop entry and preserve existing dock favorites while adding BookScan
+  - [x] Prepare verified changes and configure tested GitHub release artifacts
+- **Evidence:**
+  - [x] Full tests, installed-wheel smoke, pip check and retained verification pass
+  - [x] Native desktop launcher resolves and opens a BookScan window; dock favorite persists
+  - [x] Source and installed wheel pass 135 tests; release configuration validates
+
+- **Results:** Linux ARM64 source and installed-wheel suites each pass 135 tests;
+  `pip check` and desktop-file validation pass. GNOME resolves `bookscan.desktop`
+  to the dedicated installed environment, and its favorites retain all previous
+  entries plus BookScan. A native Wayland window was launched and visually
+  inspected. No camera is connected; camera-independent scanning workflows pass.
+  Refreshed retained membership includes the previously omitted auto-capture
+  modules and tests; the disposable harness now passes all 135 tests.
+- **Publication follow-through:** Commit, push, confirm exact-head GitHub CI,
+  publish 1.0.1, verify remote artifacts, and install the released wheel.

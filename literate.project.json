@@ -83,7 +83,7 @@
     "runner_identity": {
       "schema": "urn:literate-ai:schema:v1:content-identity",
       "algorithm": "sha256",
-      "digest": "6d900fc344add9774751e2dbcc54a7748a89a364c8e8eaf4fd93902cc61ea038"
+      "digest": "2f04e25cb0b0825910138b96431376b431becbaaa7cfea495116bea1d8655f9b"
     },
     "required_evidence_kinds": [
       "build-result",
@@ -112,8 +112,8 @@
   "repository_policy": {
     "schema": "literate-ai/repository-policy@1",
     "default_branch": "main",
-    "main_state": "free",
-    "pre_release_version": null,
+    "main_state": "pre-release",
+    "pre_release_version": "1.0",
     "default_component": null,
     "sample_component_roots": [
       "samples"

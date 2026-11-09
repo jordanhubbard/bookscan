@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- BookScan: repair stale developer environments and install a wheel with its
+  dependencies into a dedicated per-user environment before registering the
+  desktop launcher. Developer tooling is optional for application installation.
+- Build and release: publish wheel/source artifacts, synchronize package and
+  project versions, and test source and installed wheels in GitHub CI.
+
 - BookScan: confirming a new book title now moves its image directory to the
   previewed title-based name and updates saved page paths. Existing destinations
   are preserved; failed moves or saves keep the original book and scans.

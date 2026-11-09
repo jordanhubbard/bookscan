@@ -5,9 +5,9 @@ PYTHON ?= $(if $(wildcard .venv/bin/python),.venv/bin/python,python3)
 
 all: check
 
-deps: deps-tools
-	python3 -m venv .venv
-	.venv/bin/python -m pip install -e . pytest
+deps:
+	python3 -m venv --clear .venv
+	.venv/bin/python -m pip install -e . pytest build
 
 deps-tools:
 	npm install --global --prefix "$(NPM_PREFIX)" @colbymchenry/codegraph@$(CODEGRAPH_VERSION)

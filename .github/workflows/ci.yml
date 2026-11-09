@@ -1,0 +1,25 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libopengl0 libgl1 libxkbcommon0
+      - run: make deps
+      - run: make check
+      - run: make build
+      - name: Verify installed wheel
+        run: |
+          python -m venv /tmp/bookscan-installed
+          /tmp/bookscan-installed/bin/pip install _build/dist/*.whl pytest
+          /tmp/bookscan-installed/bin/pip check
+          cd /tmp
+          QT_QPA_PLATFORM=offscreen /tmp/bookscan-installed/bin/python -m pytest "$GITHUB_WORKSPACE/components/legacy-project-wrapper/implementation/tests" --import-mode=importlib -q
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bookscan-dist
+          path: _build/dist/*
