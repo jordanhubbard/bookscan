@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.0.1 - 2026-11-09
+
+[README.md](https://github.com/jordanhubbard/bookscan/blob/v1.0.1/README.md)
+
 - BookScan: repair stale developer environments and install a wheel with its
   dependencies into a dedicated per-user environment before registering the
   desktop launcher. Developer tooling is optional for application installation.
