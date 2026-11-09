@@ -1,11 +1,8 @@
 # Project guide
 
-<!-- DOC-IDENTITY: Replace the quoted placeholder below with a short description
-     of what this project is and does. This is the front door for anyone reading
-     the documentation. -->
-
-> **Replace this paragraph** with a one-to-three sentence description of your
-> project: what it is, what it does, and who it is for.
+BookScan is a native Qt camera workspace for scanning books, organizing saved
+pages, and exporting selected books to PDF. Images and library metadata stay on
+your computer.
 
 Start with [getting started](user/getting-started.md) for installation and usage.
 See [active work](roadmap/active-work.md) for current development status.

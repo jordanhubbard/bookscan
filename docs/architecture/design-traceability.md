@@ -1,6 +1,6 @@
 # Design traceability
 
-<!-- literate-ai:authority-reviewed sha256:1baf0102dca9d29cf3b31d3b64035e0774b3eda1ccb9b18f5ce68f3a7758d2d1 -->
+<!-- literate-ai:authority-reviewed sha256:b059146c9e2d880cd46ad3cda3ab26f5a176712754c146396816a68338e13462 -->
 
 [Project guide](../README.md) → design traceability
 
@@ -13,3 +13,9 @@ derived evidence outside source authority. Changes should update the owning arti
 its nearby explanation or diagram,
 and an end-to-end test. Illustrations aid understanding; prose requirements and
 acceptance scenarios remain normative. See the [project map](../user/project-layout.md).
+
+The retained application builds wheel/source distributions with the root Makefile.
+Linux desktop entries launch the dedicated installed environment. Release policy
+mirrors the package version and gates the retained suite; GitHub CI also exercises
+the installed wheel. The wrapper Component has no package Flavor, so its native
+`litai package` gate is inapplicable; original-source packaging remains authoritative.

@@ -1,27 +1,42 @@
-# Developer entry points for the retained BookScan implementation.
+# Developer and per-user installation entry points for retained BookScan.
 IMPL := components/legacy-project-wrapper/implementation
-PYTHON ?= $(if $(wildcard .venv/bin/python),$(abspath .venv/bin/python),python3)
-.PHONY: all deps deps-tools run check smoke verify install
+PYTHON3 ?= python3
+PYTHON ?= $(abspath .venv/bin/python)
+APP_VENV ?= $(HOME)/.local/share/bookscan/venv
+.PHONY: all deps deps-tools build run check smoke verify install
 all: check
 
-deps: deps-tools
-	python3 -m venv .venv
-	.venv/bin/python -m pip install -e $(IMPL) pytest
+# Recreate disposable tooling so removed/upgraded interpreters cannot strand it.
+deps:
+	$(PYTHON3) -m venv --clear .venv
+	$(PYTHON) -m pip install -e $(IMPL) pytest build
+
+.venv/bin/python:
+	$(MAKE) deps
 
 deps-tools:
 	$(MAKE) -C $(IMPL) deps-tools
 
-run:
-	cd $(IMPL) && $(PYTHON) -m bookscan
+build: .venv/bin/python
+	mkdir -p _build/dist
+	rm -f _build/dist/bookscan-*.whl _build/dist/bookscan-*.tar.gz
+	$(PYTHON) -m build $(IMPL) --outdir $(abspath _build/dist)
 
-check:
+run: .venv/bin/python
+	$(PYTHON) -m bookscan
+
+check: .venv/bin/python
 	$(MAKE) -C $(IMPL) check PYTHON=$(PYTHON)
 
-smoke:
+smoke: .venv/bin/python
 	$(MAKE) -C $(IMPL) smoke PYTHON=$(PYTHON)
 
 verify:
 	litai verify
 
-install:
-	$(PYTHON) -m bookscan --install-desktop
+# Install a wheel independently of the checkout and developer environment.
+install: build
+	$(PYTHON3) -m venv --clear "$(APP_VENV)"
+	"$(APP_VENV)/bin/python" -m pip install _build/dist/bookscan-*.whl
+	"$(APP_VENV)/bin/python" -m pip check
+	"$(APP_VENV)/bin/python" -m bookscan --install-desktop

@@ -110,7 +110,7 @@ compression remains. Import also honors image orientation metadata.
 
 This first version supports manual capture, rotation, rectangular cropping, zoom, book organization, and
 image-based PDF export. It does not yet provide OCR, perspective correction,
-curvature correction, spread splitting, page reordering, or voice
+curvature correction, spread splitting, or voice
 commands. “Next book” and “Done” are onscreen buttons. Book types are organizational
 metadata; they do not apply different image processing.
 
@@ -170,8 +170,8 @@ books and files: create two books, import/save pages, edit a saved page, export 
 PDF per book, reopen the library, and close cleanly. It also checks the CLI entry
 point. It never opens your real library or claims to qualify physical camera input.
 
-Developer setup includes the pinned CodeGraph 1.6.2 source-intelligence tool through
-`make deps-tools` (also part of `make deps`). It installs into the user-local npm
+Optional developer tooling includes the pinned CodeGraph 1.6.2 source-intelligence tool through
+`make deps-tools`. It installs into the user-local npm
 prefix by default; keep its `bin` directory on PATH. CodeGraph is development
 tooling, not a runtime dependency of the scanning application.
 
@@ -199,9 +199,17 @@ Generated folder components follow the conservative subset of Microsoft's
 rules described above. A Browse override preserves the selected existing folder
 exactly; the application does not rename its parent directories.
 
-On Linux, `make install` installs the application icon and a per-user desktop
-launcher. BookScan then appears in the desktop applications menu. The same icon
-is bundled with the Python package and used for Qt application windows.
+On Linux, run `make deps && make install` to build a wheel, install the application
+and its dependencies into `~/.local/share/bookscan/venv`, and register its icon
+and per-user desktop launcher. BookScan appears in the applications menu and can
+be pinned using the desktop's Add to Favorites action. The installed application
+is independent of the checkout and developer environment. `make install` replaces
+the managed application environment; libraries and scans are stored separately.
+Python must remain installed. Rerun installation after removing its interpreter.
+
+`make build` produces the wheel and source archive in `_build/dist/`.
+`make deps` recreates the disposable developer environment and repairs stale
+interpreter links. Install CodeGraph separately with `make deps-tools` when needed.
 
 ## Keyboard operation
 
@@ -229,3 +237,10 @@ and Alt+M focuses the camera selector; arrow keys change the selection.
 
 Crop selection and dragging to pan use the mouse. Deletion still requires
 confirmation, and unavailable actions stay disabled for keyboard use too.
+
+## Release engineers
+
+- `jordanhubbard`
+
+Releases use `literate.release.json`, the retained application test suite, and
+GitHub CI. Publish wheel and source archives from the exact release revision.
